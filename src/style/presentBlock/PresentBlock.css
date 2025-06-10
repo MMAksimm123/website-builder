@@ -1,0 +1,17 @@
+.containerInfo {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.blockText {
+  max-width: 531px;
+}
+
+.blockTitle {
+  font-size: 60px;
+}
+
+.blockLabel {
+  font-size: 22px;
+}

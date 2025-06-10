@@ -1,0 +1,17 @@
+.containerExample {
+  max-width: 450px;  /* Фиксированная ширина контейнера */
+  height: 200px; /* Фиксированная высота контейнера */
+  overflow: hidden; /* Обрезать лишнее */
+  border: 1px solid #191A23; /* Для наглядности */
+}
+
+.imgExample {
+  width: 100%;
+  height: auto;
+  display: block;
+  align-items: center;
+}
+
+.textExample {
+  font-family: 'Comfortaa', sans-serif;
+}

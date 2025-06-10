@@ -1,0 +1,25 @@
+.headerLine {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.logoHeader {
+  max-width: 110px;
+  max-height: 110px;
+  fill: #B9FF66;
+}
+
+.buttonHeader {
+  height: 68px;
+  width: 231px;
+  background-color: transparent;
+  font-family: 'Comfortaa', sans-serif;
+  border-radius: 14px;
+  border: 1px solid #191A23;
+}
+
+.buttonHeader:hover {
+  background-color: #B9FF66;
+  transition: background-color 0.35s;
+}

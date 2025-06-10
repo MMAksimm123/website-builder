@@ -1,0 +1,6 @@
+.cardsExample {
+  display: flex;
+  flex-direction: row;
+  grid-area: 10px;
+  flex-wrap: wrap;
+}
