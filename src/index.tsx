@@ -7,6 +7,7 @@ import LoginindSystem from './panel/LoginingSystem';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RegistrationSystem from './panel/RegistrationSystem';
 import Main from './panel/Main';
+import DevArea from './panel/DevArea';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -19,6 +20,7 @@ root.render(
         <Route path="/login" element={<LoginindSystem />} />
         <Route path='/registration' element={<RegistrationSystem />} />
         <Route path='/main' element={<Main />} />
+        <Route path='/dev' element={<DevArea />} />
       </Routes>
     </Router>
   </React.StrictMode>

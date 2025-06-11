@@ -16,7 +16,7 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 
 // Анимация печатающего текста
 const typed = new Typed('.typed', {
-    strings: ['Привет, я Алексей', 'Frontend-разработчик', 'UI/UX энтузиаст'],
+    strings: ['Привет, ваше имя', 'перечисление 1', 'Перечисление 2'],
     typeSpeed: 50,
     backSpeed: 30,
     loop: true

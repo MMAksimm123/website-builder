@@ -8,7 +8,11 @@ import exampleImg2 from '../picture/examplesWebsite/example2.png';
 import exampleImg3 from '../picture/examplesWebsite/example3.png';
 import '../style/MainPage/Main.css';
 
-function Main() {
+interface CustomLoginingProps {
+  createPath?: string;
+}
+
+function Main({ createPath = "dev" }: CustomLoginingProps) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -59,7 +63,7 @@ function Main() {
         Выйти
       </button> */}
       <div className='cardsExample'>
-        <ExampleCards image={exampleImg1}/>
+        <ExampleCards createPath='dev' image={exampleImg1}/>
         <ExampleCards image={exampleImg2} />
         <ExampleCards image={exampleImg3} />
       </div>

@@ -1,12 +1,17 @@
+import { useNavigate } from 'react-router-dom';
+import { handleNavigate } from '../../functions/Navigate/Navigate';
 import '../../style/ExampleCards/ExampleCards.css';
 
 interface ExampleCardsProps {
   image: string;
+  createPath?: string;
 }
 
-const ExampleCards = ({ image }: ExampleCardsProps) => {
+const ExampleCards = ({ image, createPath='dev' }: ExampleCardsProps) => {
+  const navigate = useNavigate();
+
   return (
-    <div className='containerExample'>
+    <div className='containerExample' onClick={() => handleNavigate(navigate, createPath)}>
       <div >
         <img className='imgExample' src={image} alt="Пример" />
       </div>
