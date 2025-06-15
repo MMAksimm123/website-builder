@@ -34,7 +34,6 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
 
       if (error) throw error;
 
-      // Перенаправляем на главную страницу после успешного входа
       navigate('/main');
 
     } catch (error) {

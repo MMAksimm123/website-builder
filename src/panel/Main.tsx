@@ -26,7 +26,6 @@ function Main({ createPath = "dev" }: CustomLoginingProps) {
           return;
         }
 
-        // Явно проверяем что email есть и это строка
         if (user.email && typeof user.email === 'string') {
           setUserEmail(user.email);
         } else {
@@ -57,15 +56,11 @@ function Main({ createPath = "dev" }: CustomLoginingProps) {
       <header>
         <Logo />
       </header>
-      {/* <h1>Добро пожаловать!</h1>
-      {userEmail && <p>Вы вошли как: {userEmail}</p>}
-      <button onClick={handleLogout} className="logout-button">
-        Выйти
-      </button> */}
       <div className='cardsExample'>
-        <ExampleCards createPath='dev' image={exampleImg1}/>
-        <ExampleCards image={exampleImg2} />
-        <ExampleCards image={exampleImg3} />
+        {/* Передаем ID шаблонов из базы данных */}
+        <ExampleCards createPath='dev' image={exampleImg1} templateId={1} />
+        <ExampleCards image={exampleImg2} templateId={2} />
+        <ExampleCards image={exampleImg3} templateId={3} />
       </div>
     </div>
   );

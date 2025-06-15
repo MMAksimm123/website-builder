@@ -23,7 +23,6 @@ const DevArea = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
-  // Получаем текущего пользователя
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -32,13 +31,11 @@ const DevArea = () => {
     getCurrentUser();
   }, []);
 
-  // Загрузка данных
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
 
       try {
-        // Пытаемся загрузить сохраненный проект пользователя
         if (userId) {
           const { data, error } = await supabase
             .from('user_projects')
@@ -57,16 +54,40 @@ const DevArea = () => {
           }
         }
 
-        // Загружаем шаблоны
-        const [html, css, js] = await Promise.all([
-          fetch('/examples/example1/index.html').then(r => r.text()),
-          fetch('/examples/example1/style.css').then(r => r.text()),
-          fetch('/examples/example1/index.js').then(r => r.text())
-        ]);
+        const { data: defaultTemplate, error: templateError } = await supabase
+          .from('templates')
+          .select('html, css, js')
+          .eq('id', 1)
+          .single();
 
-        setCode({ html, css, js });
+        if (!templateError && defaultTemplate) {
+          setCode({
+            html: defaultTemplate.html || '',
+            css: defaultTemplate.css || '',
+            js: defaultTemplate.js || ''
+          });
+
+          if (userId) {
+            await supabase
+              .from('user_projects')
+              .upsert({
+                user_id: userId,
+                html: defaultTemplate.html,
+                css: defaultTemplate.css,
+                js: defaultTemplate.js,
+                updated_at: new Date()
+              }, {
+                onConflict: 'user_id'
+              });
+          }
+        }
       } catch (error) {
         console.error('Error loading data:', error);
+        setCode({
+          html: '<!DOCTYPE html><html><head><title>Default</title></head><body><h1>Welcome</h1></body></html>',
+          css: 'body { font-family: Arial; }',
+          js: 'console.log("Hello world");'
+        });
       } finally {
         setLoading(false);
       }
@@ -77,7 +98,6 @@ const DevArea = () => {
     }
   }, [userId]);
 
-  // Обновление iframe
   useEffect(() => {
     const timeout = setTimeout(() => {
       setSrcDoc(`

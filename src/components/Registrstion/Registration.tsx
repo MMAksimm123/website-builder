@@ -31,7 +31,6 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
     setLoading(true);
     setError('');
 
-    // Валидация
     if (formData.password !== formData.confirmPassword) {
       setError('Пароли не совпадают');
       setLoading(false);
@@ -50,7 +49,7 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
         password: formData.password,
         options: {
           data: {
-            full_name: '', // Можно добавить поле в форму
+            full_name: '',
             avatar_url: ''
           }
         }
@@ -58,7 +57,6 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
 
       if (authError) throw authError;
 
-      // Перенаправление с использованием navigate напрямую
       navigate(createPath, {
         state: {
           registrationSuccess: true,
