@@ -162,7 +162,7 @@ const DevArea = () => {
   const handleSaveToZip = () => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
-    zip.file("styles.css", code.css);
+    zip.file("style.css", code.css);
     zip.file("script.js", code.js);
 
     zip.generateAsync({ type: "blob" })

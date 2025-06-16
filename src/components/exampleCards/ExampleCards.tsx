@@ -13,6 +13,7 @@ const ExampleCards = ({ image, createPath='dev', templateId }: ExampleCardsProps
   const navigate = useNavigate();
 
   const handleTemplateSelect = async () => {
+    console.log('P')
     if (templateId) {
       const { data, error } = await supabase
         .from('templates')
