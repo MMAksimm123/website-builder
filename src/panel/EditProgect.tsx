@@ -1,6 +1,6 @@
-// DevArea.tsx
+// EditProject.tsx
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -12,51 +12,75 @@ interface TemplateFiles {
   js: string;
 }
 
-const DevArea = () => {
+const EditProject = () => {
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
   const [code, setCode] = useState<TemplateFiles>({
     html: '',
     css: '',
     js: ''
   });
+  const [originalCode, setOriginalCode] = useState<TemplateFiles>({
+    html: '',
+    css: '',
+    js: ''
+  });
   const [srcDoc, setSrcDoc] = useState<string>('');
-  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
-  const navigate = useNavigate();
+  const [hasChanges, setHasChanges] = useState(false);
+  const [projectName, setProjectName] = useState('');
 
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
-      setLoading(false);
+    const loadProject = async () => {
+      try {
+        // Если есть переданные данные из UserProjects
+        if (location.state?.initialCode) {
+          setCode(location.state.initialCode);
+          setOriginalCode(location.state.initialCode);
+          setLoading(false);
+          return;
+        }
 
-      // Загружаем шаблон по умолчанию
-      const { data: defaultTemplate, error: templateError } = await supabase
-        .from('templates')
-        .select('html, css, js')
-        .eq('id', 1)
-        .single();
+        // Загружаем проект из базы данных
+        const { data, error } = await supabase
+          .from('user_projects')
+          .select('html, css, js, name')
+          .eq('id', id)
+          .single();
 
-      if (!templateError && defaultTemplate) {
-        setCode({
-          html: defaultTemplate.html || '',
-          css: defaultTemplate.css || '',
-          js: defaultTemplate.js || ''
-        });
-      } else {
-        // Fallback default code
-        setCode({
-          html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
-          css: 'body { font-family: Arial; }',
-          js: 'console.log("Hello world");'
-        });
+        if (error) throw error;
+
+        const projectData = {
+          html: data.html || '',
+          css: data.css || '',
+          js: data.js || ''
+        };
+
+        setCode(projectData);
+        setOriginalCode(projectData);
+        setProjectName(data.name || `Проект ${id}`);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading project:', error);
+        setLoading(false);
       }
     };
 
-    getCurrentUser();
-  }, []);
+    if (id) {
+      loadProject();
+    }
+  }, [id, location.state]);
+
+  useEffect(() => {
+    const changesExist =
+      code.html !== originalCode.html ||
+      code.css !== originalCode.css ||
+      code.js !== originalCode.js;
+    setHasChanges(changesExist);
+  }, [code, originalCode]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -86,39 +110,29 @@ const DevArea = () => {
   };
 
   const handleSaveToCloud = async () => {
-    if (!userId) {
-      setSaveMessage('Ошибка: Пользователь не авторизован');
-      return;
-    }
-
-    const projectName = prompt('Введите название для вашего проекта:');
-    if (!projectName) return;
+    if (!id) return;
 
     setIsSaving(true);
     setSaveMessage('Сохранение...');
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('user_projects')
-        .insert({
-          user_id: userId,
+        .update({
           html: code.html,
           css: code.css,
           js: code.js,
-          name: projectName,
           updated_at: new Date()
         })
-        .select()
-        .single();
+        .eq('id', id);
 
       if (error) throw error;
 
-      setSaveMessage('Успешно сохранено в облаке!');
-      setTimeout(() => {
-        setSaveMessage('');
-        // Перенаправляем в EditProject с ID нового проекта
-        navigate(`/edit/${data.id}`, { state: { initialCode: code } });
-      }, 1000);
+      // Обновляем originalCode после успешного сохранения
+      setOriginalCode(code);
+      setHasChanges(false);
+      setSaveMessage('Успешно сохранено!');
+      setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
       console.error('Error saving project:', error);
       setSaveMessage('Ошибка при сохранении');
@@ -135,16 +149,17 @@ const DevArea = () => {
 
     zip.generateAsync({ type: "blob" })
       .then((content) => {
-        saveAs(content, "project.zip");
+        saveAs(content, `${projectName || 'project'}.zip`);
       });
   };
 
   if (loading) {
-    return <div className="loading-message">Загрузка...</div>;
+    return <div className="loading-message">Загрузка проекта...</div>;
   }
 
   return (
     <div className="dev-area">
+      <h2>Редактирование: {projectName}</h2>
       <div className="preview-pane">
         <iframe
           srcDoc={srcDoc}
@@ -180,11 +195,11 @@ const DevArea = () => {
 
           <div className="save-buttons">
             <button
-              className="save-btn cloud"
+              className={`save-btn cloud ${hasChanges ? 'has-changes' : ''}`}
               onClick={handleSaveToCloud}
-              disabled={isSaving}
+              disabled={isSaving || !hasChanges}
             >
-              {isSaving ? 'Сохранение...' : 'Сохранить как новый проект'}
+              {isSaving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
             <button
               className="save-btn zip"
@@ -227,4 +242,4 @@ const DevArea = () => {
   );
 };
 
-export default DevArea;
+export default EditProject;

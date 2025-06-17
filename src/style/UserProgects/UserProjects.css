@@ -1,0 +1,51 @@
+.listContainer {
+  min-width: 150px;
+  border-right: solid 1px #191a23;
+  height: 100vh;
+}
+
+.listContainer {
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.listContainer h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.projects-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.project-item {
+  padding: 10px 15px;
+  background-color: white;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.project-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.project-date {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.error-message {
+  color: #d32f2f;
+  padding: 10px;
+  background-color: #fde0e0;
+  border-radius: 4px;
+}

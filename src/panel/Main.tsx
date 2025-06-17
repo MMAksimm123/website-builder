@@ -7,6 +7,7 @@ import exampleImg1 from '../picture/examplesWebsite/example1.png';
 import exampleImg2 from '../picture/examplesWebsite/example2.png';
 import exampleImg3 from '../picture/examplesWebsite/example3.png';
 import '../style/MainPage/Main.css';
+import UserProgects from '../components/userProgects/UserProgects';
 
 interface CustomLoginingProps {
   createPath?: string;
@@ -56,11 +57,17 @@ function Main({ createPath = "dev" }: CustomLoginingProps) {
       <header>
         <Logo />
       </header>
-      <div className='cardsExample'>
-        {/* Передаем ID шаблонов из базы данных */}
-        <ExampleCards createPath='dev' image={exampleImg1} templateId={1} />
-        <ExampleCards image={exampleImg2} templateId={2} />
-        <ExampleCards image={exampleImg3} templateId={3} />
+      <div className='mainContainer'>
+        <div>
+          <UserProgects />
+        </div>
+        <div className='cardsExample'>
+          {/* Передаем ID шаблонов из базы данных */}
+          <ExampleCards image={exampleImg1} templateId={1} />
+          {/* <ExampleCards image={exampleImg2} templateId={2} />
+          <ExampleCards image={exampleImg3} templateId={3} />
+          <ExampleCards image={exampleImg3} templateId={5} /> */}
+      </div>
       </div>
     </div>
   );

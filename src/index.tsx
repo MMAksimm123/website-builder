@@ -8,6 +8,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RegistrationSystem from './panel/RegistrationSystem';
 import Main from './panel/Main';
 import DevArea from './panel/DevArea';
+import EditProgect from './panel/EditProgect';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -21,6 +22,7 @@ root.render(
         <Route path='/registration' element={<RegistrationSystem />} />
         <Route path='/main' element={<Main />} />
         <Route path='/dev' element={<DevArea />} />
+        <Route path='/edit/:id' element={<EditProgect />} />
       </Routes>
     </Router>
   </React.StrictMode>
