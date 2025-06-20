@@ -1,111 +1,76 @@
-// DevArea.tsx
-import { useState, useEffect } from 'react';
+// src/components/DevArea.tsx
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { supabase } from '../database/supabaseClient';
+import '../style/DevArea/DevArea.css';
+import { loadTemplateFiles } from '../utils/loadTemplate';
 
-interface TemplateFiles {
-  html: string;
-  css: string;
-  js: string;
-}
+const DEFAULT_TEMPLATE = {
+  html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
+  css: 'body { font-family: Arial; }',
+  js: 'console.log("Hello world");'
+};
 
 const DevArea = () => {
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
-  const [code, setCode] = useState<TemplateFiles>({
-    html: '',
-    css: '',
-    js: ''
-  });
-  const [srcDoc, setSrcDoc] = useState<string>('');
-  const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
+  const [code, setCode] = useState(DEFAULT_TEMPLATE);
+  const [srcDoc, setSrcDoc] = useState('');
+  const [userId, setUserId] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const navigate = useNavigate();
 
+  // Инициализация
   useEffect(() => {
-    const getCurrentUser = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
-      setLoading(false);
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+      setUserId(user.id);
 
-      // Загружаем шаблон по умолчанию
-      const { data: defaultTemplate, error: templateError } = await supabase
-        .from('templates')
-        .select('html, css, js')
-        .eq('id', 1)
-        .single();
-
-      if (!templateError && defaultTemplate) {
-        setCode({
-          html: defaultTemplate.html || '',
-          css: defaultTemplate.css || '',
-          js: defaultTemplate.js || ''
-        });
-      } else {
-        // Fallback default code
-        setCode({
-          html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
-          css: 'body { font-family: Arial; }',
-          js: 'console.log("Hello world");'
-        });
+      // Загружаем шаблон из файлов
+      const template = await loadTemplateFiles(1);
+      if (template) {
+        setCode(template);
       }
     };
 
-    getCurrentUser();
-  }, []);
+    init();
+  }, [navigate]);
 
+  // Превью с дебаунсом
   useEffect(() => {
-    const timeout = setTimeout(() => {
+    const timer = setTimeout(() => {
       setSrcDoc(`
         <html>
-          <head>
-            <style>${code.css}</style>
-          </head>
-          <body>
-            ${code.html}
-            <script>${code.js}</script>
-          </body>
+          <head><style>${code.css}</style></head>
+          <body>${code.html}<script>${code.js}</script></body>
         </html>
       `);
     }, 250);
 
-    return () => clearTimeout(timeout);
-  }, [code.html, code.css, code.js]);
+    return () => clearTimeout(timer);
+  }, [code]);
 
-  const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
-    if (value !== undefined) {
-      setCode(prev => ({
-        ...prev,
-        [language]: value
-      }));
-    }
-  };
-
-  const handleSaveToCloud = async () => {
-    if (!userId) {
-      setSaveMessage('Ошибка: Пользователь не авторизован');
-      return;
-    }
-
-    const projectName = prompt('Введите название для вашего проекта:');
+  // Сохранение проекта
+  const handleSaveToCloud = useCallback(async () => {
+    const projectName = prompt('Название проекта:');
     if (!projectName) return;
 
-    setIsSaving(true);
-    setSaveMessage('Сохранение...');
-
+    setSaveStatus('saving');
     try {
       const { data, error } = await supabase
         .from('user_projects')
         .insert({
           user_id: userId,
+          name: projectName,
           html: code.html,
           css: code.css,
           js: code.js,
-          name: projectName,
           updated_at: new Date()
         })
         .select()
@@ -113,35 +78,31 @@ const DevArea = () => {
 
       if (error) throw error;
 
-      setSaveMessage('Успешно сохранено в облаке!');
-      setTimeout(() => {
-        setSaveMessage('');
-        // Перенаправляем в EditProject с ID нового проекта
-        navigate(`/edit/${data.id}`, { state: { initialCode: code } });
-      }, 1000);
+      setSaveStatus('saved');
+      setTimeout(() => navigate(`/edit/${data.id}`, {
+        state: { initialCode: code }
+      }), 1000);
     } catch (error) {
-      console.error('Error saving project:', error);
-      setSaveMessage('Ошибка при сохранении');
-    } finally {
-      setIsSaving(false);
+      console.error('Save error:', error);
+      setSaveStatus('idle');
     }
-  };
+  }, [code, userId, navigate]);
 
-  const handleSaveToZip = () => {
+  // Сохранение в ZIP
+  const handleSaveToZip = useCallback(() => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
     zip.file("style.css", code.css);
     zip.file("script.js", code.js);
+    zip.generateAsync({ type: "blob" }).then(saveAs);
+  }, [code]);
 
-    zip.generateAsync({ type: "blob" })
-      .then((content) => {
-        saveAs(content, "project.zip");
-      });
+  // Обработчик изменений кода
+  const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
+    if (value !== undefined) {
+      setCode(prev => ({ ...prev, [language]: value }));
+    }
   };
-
-  if (loading) {
-    return <div className="loading-message">Загрузка...</div>;
-  }
 
   return (
     <div className="dev-area">
@@ -158,69 +119,37 @@ const DevArea = () => {
       <div className="editor-container">
         <div className="editor-header">
           <div className="editor-tabs">
-            <button
-              className={`tab-btn ${activeTab === 'html' ? 'active' : ''}`}
-              onClick={() => setActiveTab('html')}
-            >
-              HTML
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'css' ? 'active' : ''}`}
-              onClick={() => setActiveTab('css')}
-            >
-              CSS
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'js' ? 'active' : ''}`}
-              onClick={() => setActiveTab('js')}
-            >
-              JavaScript
-            </button>
+            {(['html', 'css', 'js'] as const).map((tab) => (
+              <button
+                key={tab}
+                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab.toUpperCase()}
+              </button>
+            ))}
           </div>
-
           <div className="save-buttons">
             <button
               className="save-btn cloud"
               onClick={handleSaveToCloud}
-              disabled={isSaving}
+              disabled={saveStatus === 'saving'}
             >
-              {isSaving ? 'Сохранение...' : 'Сохранить как новый проект'}
+              {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект'}
             </button>
-            <button
-              className="save-btn zip"
-              onClick={handleSaveToZip}
-            >
+            <button className="save-btn zip" onClick={handleSaveToZip}>
               Сохранить в ZIP
             </button>
-            {saveMessage && <span className="save-message">{saveMessage}</span>}
           </div>
         </div>
 
         <div className="editor-content">
-          {activeTab === 'html' && (
-            <Editor
-              height="400px"
-              language="html"
-              value={code.html}
-              onChange={(value) => handleEditorChange(value, 'html')}
-            />
-          )}
-          {activeTab === 'css' && (
-            <Editor
-              height="400px"
-              language="css"
-              value={code.css}
-              onChange={(value) => handleEditorChange(value, 'css')}
-            />
-          )}
-          {activeTab === 'js' && (
-            <Editor
-              height="400px"
-              language="javascript"
-              value={code.js}
-              onChange={(value) => handleEditorChange(value, 'js')}
-            />
-          )}
+          <Editor
+            height="400px"
+            language={activeTab}
+            value={code[activeTab]}
+            onChange={(value) => handleEditorChange(value, activeTab)}
+          />
         </div>
       </div>
     </div>

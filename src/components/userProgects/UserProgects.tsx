@@ -1,83 +1,94 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../database/supabaseClient';
 import '../../style/UserProgects/UserProjects.css';
 
 interface UserProject {
   id: number;
-  user_id: string;
   name: string;
   updated_at: string;
-  html?: string;
-  css?: string;
-  js?: string;
 }
+
+const CACHE_TTL = 1 * 60 * 1000; // 5 минут
+const getCacheKey = (userId: string) => `user_projects_${userId}`;
 
 const UserProgects = () => {
   const [projects, setProjects] = useState<UserProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // Загрузка данных с кэшированием
+  const fetchProjects = useCallback(async (userId: string) => {
+    const cacheKey = getCacheKey(userId);
+    const cachedData = localStorage.getItem(cacheKey);
+    const cacheTime = localStorage.getItem(`${cacheKey}_time`);
+
+    // Возвращаем кэшированные данные, если они актуальны
+    if (cachedData && cacheTime && Date.now() - parseInt(cacheTime) < CACHE_TTL) {
+      return JSON.parse(cachedData) as UserProject[];
+    }
+
+    // Загружаем свежие данные
+    const { data, error } = await supabase
+      .from('user_projects')
+      .select('id, name, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .range(0, 9);
+
+    if (error) throw error;
+
+    const projectsData = data || [];
+
+    // Сохраняем в кэш
+    localStorage.setItem(cacheKey, JSON.stringify(projectsData));
+    localStorage.setItem(`${cacheKey}_time`, Date.now().toString());
+
+    return projectsData;
+  }, []);
+
   useEffect(() => {
-    const fetchUserProjects = async () => {
+    let isMounted = true;
+
+    const loadData = async () => {
       try {
+        setLoading(true);
+
+        // Получаем пользователя
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          setError('Пользователь не авторизован');
-          setLoading(false);
+          navigate('/login');
           return;
         }
 
-        const { data, error: fetchError } = await supabase
-          .from('user_projects')
-          .select('id, user_id, name, updated_at')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false });
+        // Загружаем проекты
+        const projectsData = await fetchProjects(user.id);
 
-        if (fetchError) {
-          throw fetchError;
+        if (isMounted) {
+          setProjects(projectsData);
         }
-
-        setProjects(data || []);
       } catch (err) {
         console.error('Ошибка при загрузке проектов:', err);
-        setError('Не удалось загрузить проекты');
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchUserProjects();
-  }, []);
+    loadData();
 
-  const handleProjectClick = async (projectId: number) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_projects')
-        .select('html, css, js, name')
-        .eq('id', projectId)
-        .single();
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, fetchProjects]);
 
-      if (error) throw error;
-
-      navigate(`/edit/${projectId}`, {
-        state: {
-          initialCode: {
-            html: data.html || '',
-            css: data.css || '',
-            js: data.js || ''
-          }
-        }
-      });
-    } catch (err) {
-      console.error('Ошибка при загрузке проекта:', err);
-      setError('Не удалось загрузить проект');
-    }
+  const handleProjectClick = (projectId: number) => {
+    navigate(`/edit/${projectId}`);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {
       day: '2-digit',
@@ -86,22 +97,17 @@ const UserProgects = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
+  }, []);
 
   if (loading) {
     return (
       <div className="listContainer">
         <h3>Ваши проекты</h3>
-        <div>Загрузка...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="listContainer">
-        <h3>Ваши проекты</h3>
-        <div className="error-message">{error}</div>
+        <div className="skeleton-loader">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="project-item-skeleton" />
+          ))}
+        </div>
       </div>
     );
   }
