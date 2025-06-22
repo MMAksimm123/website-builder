@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../database/supabaseClient';
 import Logo from '../components/logo/Logo';
 import ExampleCards from '../components/exampleCards/ExampleCards';
-import exampleImg1 from '../picture/examplesWebsite/example1.png';
+import exampleImg1 from '../picture/examplesWebsite/example.png';
 import '../style/MainPage/Main.css';
 import UserProgects from '../components/userProgects/UserProgects';
 import { loadTemplateFiles } from '../utils/loadTemplate';
@@ -44,7 +44,7 @@ function Main() {
   return (
     <div className="main-container">
       <header>
-        <Logo />
+        <Logo createSitePath='main'/>
       </header>
       <div className='mainContainer'>
         <div>

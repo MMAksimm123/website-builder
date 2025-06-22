@@ -1,12 +1,23 @@
 .containerExample {
-  max-width: 450px;  /* Фиксированная ширина контейнера */
-  height: 200px; /* Фиксированная высота контейнера */
-  overflow: hidden; /* Обрезать лишнее */
-  border: 1px solid #191A23; /* Для наглядности */
+  max-width: 1050px;
+  height: 500px;
+  overflow: hidden;
+  border: 2px solid #B9FF66;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 25px;
+  padding: 25px;
+}
+
+.containerImg {
+  display: flex;
+  justify-content: center;
 }
 
 .imgExample {
-  width: 100%;
+  width: 70%;
   height: auto;
   display: block;
   align-items: center;
@@ -15,4 +26,17 @@
 .textExample {
   font-family: 'Comfortaa', sans-serif;
   text-align: center;
+  font-size: 25px;
+}
+
+.description {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.containerBtn {
+  display: flex;
+  justify-content: center;
 }

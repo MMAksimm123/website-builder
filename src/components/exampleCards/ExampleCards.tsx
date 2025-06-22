@@ -15,16 +15,18 @@ const ExampleCards = ({ image, templateData }: ExampleCardsProps) => {
 
   return (
     <div className='containerExample'>
-      <div>
+      <div className='containerImg'>
         <img className='imgExample' src={image} alt="Пример" />
       </div>
-      <div>
+      <div className='description'>
         <label className='textExample'>
           Возьмите за основу этот макет, или переделайте его полностью под себя
         </label>
-        <button onClick={handleTemplateSelect}>
-          Открыть макет
-        </button>
+        <div className='containerBtn'>
+          <button className='buttonHeader' onClick={handleTemplateSelect}>
+            Открыть макет
+          </button>
+        </div>
       </div>
     </div>
   );
