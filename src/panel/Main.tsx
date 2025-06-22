@@ -8,6 +8,7 @@ import exampleImg1 from '../picture/examplesWebsite/example.png';
 import '../style/MainPage/Main.css';
 import UserProgects from '../components/userProgects/UserProgects';
 import { loadTemplateFiles } from '../utils/loadTemplate';
+import LogoutButton from '../components/LogoutButton/LogoutButton';
 
 function Main() {
   const [loading, setLoading] = useState(true);
@@ -43,8 +44,9 @@ function Main() {
 
   return (
     <div className="main-container">
-      <header>
+      <header className='headerPanel'>
         <Logo createSitePath='main'/>
+        <LogoutButton />
       </header>
       <div className='mainContainer'>
         <div>

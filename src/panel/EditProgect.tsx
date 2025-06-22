@@ -6,6 +6,8 @@ import { saveAs } from 'file-saver';
 import { supabase } from '../database/supabaseClient';
 //import '../style/EditProject/EditProject.css';
 import '../style/DevArea/DevArea.css'
+import Logo from '../components/logo/Logo';
+import LogoutButton from '../components/LogoutButton/LogoutButton';
 
 interface TemplateFiles {
   html: string;
@@ -122,13 +124,17 @@ const EditProject = () => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
     zip.file("style.css", code.css);
-    zip.file("script.js", code.js);
+    zip.file("index.js", code.js);
     zip.generateAsync({ type: "blob" }).then(saveAs);
   };
 
   return (
     <div className="dev-area">
-      <h2>Редактирование: {projectName}</h2>
+      <header className='headerPanelDev'>
+        <Logo createSitePath='main'/>
+        <h2>Редактирование: {projectName}</h2>
+        <LogoutButton />
+      </header>
       <div className="preview-pane">
         <iframe
           srcDoc={srcDoc}

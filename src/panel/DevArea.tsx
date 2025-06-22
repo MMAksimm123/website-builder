@@ -7,6 +7,8 @@ import { saveAs } from 'file-saver';
 import { supabase } from '../database/supabaseClient';
 import '../style/DevArea/DevArea.css';
 import { loadTemplateFiles } from '../utils/loadTemplate';
+import Logo from '../components/logo/Logo';
+import LogoutButton from '../components/LogoutButton/LogoutButton';
 
 const DEFAULT_TEMPLATE = {
   html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
@@ -93,7 +95,7 @@ const DevArea = () => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
     zip.file("style.css", code.css);
-    zip.file("script.js", code.js);
+    zip.file("index.js", code.js);
     zip.generateAsync({ type: "blob" }).then(saveAs);
   }, [code]);
 
@@ -106,6 +108,10 @@ const DevArea = () => {
 
   return (
     <div className="dev-area">
+      <header className='headerPanelDev'>
+        <Logo createSitePath='main'/>
+        <LogoutButton />
+      </header>
       <div className="preview-pane">
         <iframe
           srcDoc={srcDoc}
