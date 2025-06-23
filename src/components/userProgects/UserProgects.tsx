@@ -9,7 +9,7 @@ interface UserProject {
   updated_at: string;
 }
 
-const CACHE_TTL = 1 * 60 * 1000; // 5 минут
+const CACHE_TTL = 0.25 * 60 * 1000; // 5 минут
 const getCacheKey = (userId: string) => `user_projects_${userId}`;
 
 const UserProgects = () => {
