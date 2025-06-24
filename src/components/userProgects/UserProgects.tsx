@@ -9,7 +9,7 @@ interface UserProject {
   updated_at: string;
 }
 
-const CACHE_TTL = 0.25 * 60 * 1000; // 5 минут
+const CACHE_TTL = 0.25 * 60 * 1000;
 const getCacheKey = (userId: string) => `user_projects_${userId}`;
 
 const UserProgects = () => {
@@ -17,18 +17,15 @@ const UserProgects = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Загрузка данных с кэшированием
   const fetchProjects = useCallback(async (userId: string) => {
     const cacheKey = getCacheKey(userId);
     const cachedData = localStorage.getItem(cacheKey);
     const cacheTime = localStorage.getItem(`${cacheKey}_time`);
 
-    // Возвращаем кэшированные данные, если они актуальны
     if (cachedData && cacheTime && Date.now() - parseInt(cacheTime) < CACHE_TTL) {
       return JSON.parse(cachedData) as UserProject[];
     }
 
-    // Загружаем свежие данные
     const { data, error } = await supabase
       .from('user_projects')
       .select('id, name, updated_at')
@@ -40,7 +37,6 @@ const UserProgects = () => {
 
     const projectsData = data || [];
 
-    // Сохраняем в кэш
     localStorage.setItem(cacheKey, JSON.stringify(projectsData));
     localStorage.setItem(`${cacheKey}_time`, Date.now().toString());
 
@@ -54,7 +50,6 @@ const UserProgects = () => {
       try {
         setLoading(true);
 
-        // Получаем пользователя
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
@@ -62,7 +57,6 @@ const UserProgects = () => {
           return;
         }
 
-        // Загружаем проекты
         const projectsData = await fetchProjects(user.id);
 
         if (isMounted) {

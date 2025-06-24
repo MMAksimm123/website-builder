@@ -1,5 +1,4 @@
-// src/components/DevArea.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
@@ -9,6 +8,7 @@ import '../style/DevArea/DevArea.css';
 import { loadTemplateFiles } from '../utils/loadTemplate';
 import Logo from '../components/logo/Logo';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
+import ImageUploader from '../components/ImageUploader/ImageUploader';
 
 const DEFAULT_TEMPLATE = {
   html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
@@ -22,9 +22,42 @@ const DevArea = () => {
   const [srcDoc, setSrcDoc] = useState('');
   const [userId, setUserId] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const editorRef = useRef<any>(null);
   const navigate = useNavigate();
 
-  // Инициализация
+  const handleEditorDidMount = (editor: any) => {
+    editorRef.current = editor;
+  };
+
+  const insertTextAtCursor = (text: string) => {
+    if (!editorRef.current) return;
+
+    const selection = editorRef.current.getSelection();
+    const range = {
+      startLineNumber: selection.startLineNumber,
+      startColumn: selection.startColumn,
+      endLineNumber: selection.endLineNumber,
+      endColumn: selection.endColumn
+    };
+
+    editorRef.current.executeEdits('insert-image', [{
+      range,
+      text: text,
+      forceMoveMarkers: true
+    }]);
+  };
+
+  const handleImageUploaded = (image: { id: string; url: string; name: string }) => {
+    console.log('Image uploaded:', image);
+  };
+
+  const handleInsertImage = (url: string) => {
+    if (activeTab === 'html') {
+      const imgTag = `<img src="${url}" alt="Uploaded image" />`;
+      insertTextAtCursor(imgTag);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -34,7 +67,6 @@ const DevArea = () => {
       }
       setUserId(user.id);
 
-      // Загружаем шаблон из файлов
       const template = await loadTemplateFiles(1);
       if (template) {
         setCode(template);
@@ -44,7 +76,6 @@ const DevArea = () => {
     init();
   }, [navigate]);
 
-  // Превью с дебаунсом
   useEffect(() => {
     const timer = setTimeout(() => {
       setSrcDoc(`
@@ -58,7 +89,6 @@ const DevArea = () => {
     return () => clearTimeout(timer);
   }, [code]);
 
-  // Сохранение проекта
   const handleSaveToCloud = useCallback(async () => {
     const projectName = prompt('Название проекта:');
     if (!projectName) return;
@@ -90,7 +120,6 @@ const DevArea = () => {
     }
   }, [code, userId, navigate]);
 
-  // Сохранение в ZIP
   const handleSaveToZip = useCallback(() => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
@@ -99,7 +128,6 @@ const DevArea = () => {
     zip.generateAsync({ type: "blob" }).then(saveAs);
   }, [code]);
 
-  // Обработчик изменений кода
   const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
     if (value !== undefined) {
       setCode(prev => ({ ...prev, [language]: value }));
@@ -136,6 +164,10 @@ const DevArea = () => {
             ))}
           </div>
           <div className="save-buttons">
+            {/* <ImageUploader
+              onImageUploaded={handleImageUploaded}
+              onInsertImage={handleInsertImage}
+            /> */}
             <button
               className="save-btn cloud"
               onClick={handleSaveToCloud}
@@ -155,6 +187,7 @@ const DevArea = () => {
             language={activeTab}
             value={code[activeTab]}
             onChange={(value) => handleEditorChange(value, activeTab)}
+            onMount={handleEditorDidMount}
           />
         </div>
       </div>

@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { uploadImage } from '../../utils/uploadImage';
-import './ImageUploader.css';
+import { UploadedImage, uploadImage } from '../../utils/uploadImage';
+import '../../style/ImageUploader/ImageUploader.css'
 
 interface ImageUploaderProps {
-  projectId?: number;
-  onImageUploaded: (image: { id: string; url: string; name: string }) => void;
+  projectId?: string;
+  onImageUploaded?: (image: UploadedImage) => void;
+  onInsertImage?: (url: string) => void;
 }
 
-const ImageUploader = ({ projectId, onImageUploaded }: ImageUploaderProps) => {
+const ImageUploader = ({ projectId, onImageUploaded, onInsertImage }: ImageUploaderProps) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -17,34 +20,82 @@ const ImageUploader = ({ projectId, onImageUploaded }: ImageUploaderProps) => {
     setIsUploading(true);
     try {
       const uploadedImage = await uploadImage(file, projectId);
-      onImageUploaded(uploadedImage);
+      setImageUrl(uploadedImage.url);
+      setShowModal(true);
+
+      if (onImageUploaded) {
+        onImageUploaded(uploadedImage);
+      }
     } catch (error) {
-      console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      console.error('Upload error:', error);
+      alert(`Ошибка загрузки: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setIsUploading(false);
-      e.target.value = ''; // Сбрасываем значение input
+      e.target.value = '';
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(imageUrl)
+      .then(() => alert('Ссылка скопирована в буфер обмена'))
+      .catch(err => console.error('Ошибка копирования:', err));
+  };
+
+  const handleInsert = () => {
+    if (onInsertImage && imageUrl) {
+      onInsertImage(imageUrl);
+      setShowModal(false);
     }
   };
 
   return (
     <div className="image-uploader">
       <label className={`upload-button ${isUploading ? 'uploading' : ''}`}>
-        {isUploading ? (
-          <span>Uploading...</span>
-        ) : (
-          <>
-            <span>Upload Image</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              disabled={isUploading}
-              style={{ display: 'none' }}
-            />
-          </>
-        )}
+        {isUploading ? 'Загрузка...' : 'Загрузить изображение'}
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          disabled={isUploading}
+          style={{ display: 'none' }}
+        />
       </label>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>Изображение успешно загружено</h3>
+            <div className="url-container">
+              <input
+                type="text"
+                value={imageUrl}
+                readOnly
+                className="url-input"
+                onClick={e => e.currentTarget.select()}
+              />
+              <button onClick={copyToClipboard} className="copy-button">
+                Копировать
+              </button>
+            </div>
+            <div className="modal-actions">
+              {/* {onInsertImage && (
+                <button
+                  onClick={handleInsert}
+                  className="insert-button"
+                >
+                  Вставить в редактор
+                </button>
+              )} */}
+              <button
+                onClick={() => setShowModal(false)}
+                className="close-button"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

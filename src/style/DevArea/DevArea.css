@@ -86,3 +86,8 @@ iframe {
   align-items: center;
   border-bottom: 1px solid #B9FF66;
 }
+
+.save-buttons {
+  display: flex;
+  flex-direction: row;
+}

@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { supabase } from '../database/supabaseClient';
-//import '../style/EditProject/EditProject.css';
-import '../style/DevArea/DevArea.css'
+import '../style/DevArea/DevArea.css';
 import Logo from '../components/logo/Logo';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
+import ImageUploader from '../components/ImageUploader/ImageUploader';
 
 interface TemplateFiles {
   html: string;
@@ -27,9 +27,42 @@ const EditProject = () => {
   const [srcDoc, setSrcDoc] = useState('');
   const [projectName, setProjectName] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const editorRef = useRef<any>(null);
   let saveTimer: NodeJS.Timeout;
 
-  // Загрузка проекта
+  const handleEditorDidMount = (editor: any) => {
+    editorRef.current = editor;
+  };
+
+  const insertTextAtCursor = (text: string) => {
+    if (!editorRef.current) return;
+
+    const selection = editorRef.current.getSelection();
+    const range = {
+      startLineNumber: selection.startLineNumber,
+      startColumn: selection.startColumn,
+      endLineNumber: selection.endLineNumber,
+      endColumn: selection.endColumn
+    };
+
+    editorRef.current.executeEdits('insert-image', [{
+      range,
+      text: text,
+      forceMoveMarkers: true
+    }]);
+  };
+
+  const handleImageUploaded = (image: { id: string; url: string; name: string }) => {
+  console.log('Image uploaded:', image);
+};
+
+  const handleInsertImage = (url: string) => {
+    if (activeTab === 'html') {
+      const imgTag = `<img src="${url}" alt="Uploaded image" />`;
+      insertTextAtCursor(imgTag);
+    }
+  };
+
   useEffect(() => {
     const loadProject = async () => {
       try {
@@ -63,7 +96,6 @@ const EditProject = () => {
     if (id) loadProject();
   }, [id, location.state]);
 
-  // Автосохранение при изменениях
   const saveProject = useCallback(async (currentCode: TemplateFiles) => {
     if (!id || !AUTO_SAVE_ENABLED) return;
 
@@ -92,7 +124,6 @@ const EditProject = () => {
     }
   }, [id]);
 
-  // Обработчик изменений с дебаунсом
   const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
     if (value === undefined) return;
 
@@ -105,7 +136,6 @@ const EditProject = () => {
     }
   };
 
-  // Генерация превью с дебаунсом
   useEffect(() => {
     const timer = setTimeout(() => {
       setSrcDoc(`
@@ -119,7 +149,6 @@ const EditProject = () => {
     return () => clearTimeout(timer);
   }, [code]);
 
-  // Сохранение в ZIP
   const handleSaveToZip = () => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
@@ -159,13 +188,18 @@ const EditProject = () => {
             ))}
           </div>
           <div className="save-buttons">
-            <button className="save-btn zip" onClick={handleSaveToZip}>
-              Сохранить в ZIP
-            </button>
             <div className={`save-status ${saveStatus}`}>
               {saveStatus === 'saving' ? 'Сохранение...' :
                saveStatus === 'saved' ? 'Сохранено!' : ''}
             </div>
+            <ImageUploader
+              projectId={id}
+              onImageUploaded={handleImageUploaded}
+              onInsertImage={handleInsertImage}
+            />
+            <button className="save-btn zip" onClick={handleSaveToZip}>
+              Сохранить в ZIP
+            </button>
           </div>
         </div>
 
@@ -175,6 +209,7 @@ const EditProject = () => {
             language={activeTab}
             value={code[activeTab]}
             onChange={(value) => handleEditorChange(value, activeTab)}
+            onMount={handleEditorDidMount}
           />
         </div>
       </div>

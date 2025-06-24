@@ -1,4 +1,3 @@
-// src/components/Main.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../database/supabaseClient';
@@ -18,7 +17,6 @@ function Main() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Проверяем аутентификацию пользователя
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
@@ -26,7 +24,6 @@ function Main() {
           return;
         }
 
-        // Загружаем шаблон из файлов
         const templateData = await loadTemplateFiles(1);
         setTemplate(templateData);
       } catch (err) {
