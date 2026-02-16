@@ -1,93 +1,262 @@
 .dev-area {
-  display: flex;
-  flex-direction: column;
   height: 100vh;
-}
-
-.preview-pane {
-  border-bottom: 1px solid #B9FF66 solid #ccc;
-}
-
-.editor-container {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.editor-tabs {
+.headerPanelDev {
   display: flex;
-  background: #f5f5f5;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: white;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
-.tab-btn {
-  padding: 10px 15px;
+.viewport-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.viewport-selector {
+  display: flex;
+  gap: 5px;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.viewport-btn {
+  padding: 8px 16px;
   border: none;
   background: none;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-.active {
-  background-color: #B9FF66;
+.viewport-btn:hover {
+  background-color: #f0f0f0;
 }
 
-.tab-button.active {
-  background: #ddd;
-  font-weight: bold;
+.viewport-btn.active {
+  background-color: #b9ff66;
+  color: #000;
 }
 
-.editor-content {
+.project-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.main-content {
+  display: flex;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
-iframe {
-  border: none;
+.preview-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e0e0e0;
+  min-width: 300px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.preview-container {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.preview-container > div {
+  height: 100%;
+}
+
+.preview-container iframe {
+  display: block;
+  transition: all 0.3s ease;
+}
+
+.editor-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  height: 100%;
+  overflow: hidden;
 }
 
 .editor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f5f5f5;
-  padding: 0 10px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
-.save-button {
+.editor-tabs {
+  display: flex;
+  gap: 5px;
+}
+
+.tab-btn {
   padding: 8px 16px;
-  background: #4CAF50;
-  color: white;
   border: none;
+  background: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  transition: all 0.2s ease;
 }
 
-.save-btn {
-  padding: 10px 15px;
-  border: 1px solid #B9FF66 solid #191A23;
-  border-radius: 14px;
-  cursor: pointer;
-  margin-left: 10px;
+.tab-btn:hover {
+  background-color: #e0e0e0;
 }
 
-.save-btn:hover {
-    background-color: #B9FF66;
-    transition: background-color 0.35s;
-}
-
-.save-button:hover {
-  background: #45a049;
-}
-
-.headerPanelDev {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  padding-right: 15px;
-  align-items: center;
-  border-bottom: 1px solid #B9FF66;
+.tab-btn.active {
+  background-color: #b9ff66;
+  color: #000;
 }
 
 .save-buttons {
   display: flex;
-  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+}
+
+.save-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.save-btn.cloud {
+  background-color: #007bff;
+  color: white;
+}
+
+.save-btn.cloud:hover {
+  background-color: #0056b3;
+}
+
+.save-btn.cloud:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.save-btn.zip {
+  background-color: #28a745;
+  color: white;
+}
+
+.save-btn.zip:hover {
+  background-color: #218838;
+}
+
+.save-status {
+  font-size: 14px;
+  color: #666;
+  min-width: 100px;
+  text-align: right;
+}
+
+.save-status.saving {
+  color: #007bff;
+}
+
+.save-status.saved {
+  color: #28a745;
+}
+
+.editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Стили для Monaco Editor */
+.monaco-editor {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .preview-section {
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    height: 50%;
+  }
+
+  .editor-section {
+    height: 50%;
+  }
+
+  .editor-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .save-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 768px) {
+  .viewport-selector {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .viewport-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .project-title {
+    font-size: 16px;
+  }
+
+  .save-buttons {
+    flex-wrap: wrap;
+  }
+
+  .save-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .save-status {
+    min-width: auto;
+  }
 }

@@ -15,7 +15,7 @@ const CustomHeader = ({ createSitePath = "login" }: CustomHeaderProps) => {
         <img src={Logo} className='logoHeader'/>
         <button
           onClick={() => handleNavigate(navigate, createSitePath)}
-          className='buttonHeader'
+          className='buttonHeaderstart'
         >
           Создать сайт
         </button>

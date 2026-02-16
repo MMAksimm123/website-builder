@@ -1,22 +1,338 @@
-.cardsExample {
-  display: flex;
-  flex-direction: row;
-  grid-area: 10px;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.mainContainer {
-  display: flex;
-  flex-direction: row;
-  gap: 15px;
-  padding: 20px;
+.main-container {
+  min-height: 100vh;
+  background: #f5f5f5;
 }
 
 .headerPanel {
   display: flex;
-  flex-direction: row;
   justify-content: space-between;
-  padding-right: 15px;
   align-items: center;
+  padding: 15px 30px;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.mainContainer {
+  display: flex;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 30px;
+  gap: 35px;
+}
+
+.projects-section {
+  flex: 0 0 280px; /* Уменьшено с 300px до 280px */
+  min-width: 240px; /* Добавлена минимальная ширина */
+  max-width: 320px; /* Добавлена максимальная ширина */
+}
+
+.templates-section {
+  flex: 1;
+  min-width: 0; /* Предотвращает переполнение */
+}
+
+.templates-header {
+  margin-bottom: 30px;
+}
+
+.templates-header h2 {
+  font-size: 28px;
+  color: #333;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.templates-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.search-container {
+  width: 100%;
+}
+
+.search-input {
+  width: 97%;
+  padding: 14px 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #b9ff66;
+  box-shadow: 0 0 0 3px rgba(185, 255, 102, 0.2);
+}
+
+.search-input::placeholder {
+  color: #999;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 30px;
+  margin-top: 20px;
+}
+
+.loading-templates {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #b9ff66;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Стили для секции проектов */
+.projects-section .listContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.projects-section h3 {
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.projects-section .projects-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.projects-section .project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.projects-section .project-item:hover {
+  background: #f0f0f0;
+  border-color: #b9ff66;
+  transform: translateX(2px);
+}
+
+.projects-section .project-info {
+  flex: 1;
+  min-width: 0; /* Предотвращает переполнение */
+}
+
+.projects-section .project-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projects-section .project-date {
+  font-size: 12px;
+  color: #999;
+}
+
+.projects-section .project-arrow {
+  font-size: 18px;
+  color: #b9ff66;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.projects-section .project-item:hover .project-arrow {
+  opacity: 1;
+}
+
+.projects-section .empty-state {
+  text-align: center;
+  padding: 30px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.projects-section .create-project-button {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background: #b9ff66;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.projects-section .create-project-button:hover {
+  background: #a0e64d;
+}
+
+/* Адаптивность */
+@media (max-width: 1400px) {
+  .mainContainer {
+    padding: 25px;
+    gap: 25px;
+  }
+
+  .projects-section {
+    flex: 0 0 260px; /* Еще меньше на средних экранах */
+  }
+
+  .templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 25px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .mainContainer {
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .projects-section {
+    flex: 0 0 240px; /* Минимальный размер */
+  }
+
+  .templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+  }
+
+  .templates-header h2 {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 992px) {
+  .mainContainer {
+    flex-direction: column;
+  }
+
+  .projects-section {
+    flex: auto;
+    width: 100%;
+    max-width: 100%; /* На мобильных занимает всю ширину */
+  }
+
+  .projects-section .listContainer {
+    padding: 15px;
+  }
+
+  .projects-section .projects-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+
+  .templates-header h2 {
+    font-size: 22px;
+  }
+
+  .templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .headerPanel {
+    padding: 12px 20px;
+  }
+
+  .mainContainer {
+    padding: 15px;
+  }
+
+  .templates-header h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+  }
+
+  .search-input {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .templates-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .projects-section .projects-list {
+    grid-template-columns: 1fr; /* На маленьких экранах одна колонка */
+  }
+}
+
+@media (max-width: 480px) {
+  .headerPanel {
+    padding: 10px 15px;
+  }
+
+  .mainContainer {
+    padding: 10px;
+  }
+
+  .templates-header h2 {
+    font-size: 18px;
+  }
+
+  .search-input {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .projects-section .listContainer {
+    padding: 12px;
+  }
+
+  .projects-section h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .projects-section .project-item {
+    padding: 10px 12px;
+  }
+
+  .projects-section .project-name {
+    font-size: 14px;
+  }
+
+  .projects-section .project-date {
+    font-size: 11px;
+  }
 }

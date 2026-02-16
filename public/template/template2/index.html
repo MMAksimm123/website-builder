@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VELURA | Премиальная одежда</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <nav class="navbar">
+            <a href="#" class="logo">VELURA</a>
+            <ul class="nav-links">
+                <li><a href="#catalog">Коллекция</a></li>
+                <li><a href="#new">Новинки</a></li>
+                <li><a href="#about">История</a></li>
+                <li><a href="#contact">Контакты</a></li>
+            </ul>
+            <div class="cart-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"></path>
+                </svg>
+                <span class="cart-count">0</span>
+            </div>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="hero-content">
+            <span class="hero-subtitle">Элегантность в деталях</span>
+            <h1>Новая коллекция <span class="highlight">осень-зима 2024</span></h1>
+            <p>Изысканные ткани, безупречный крой, вневременной стиль</p>
+            <div class="hero-buttons">
+                <a href="#catalog" class="cta-button">Исследовать</a>
+                <a href="#about" class="secondary-button">О бренде</a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <div class="image-wrapper">
+                <img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Fashion">
+            </div>
+        </div>
+    </section>
+
+    <section id="catalog" class="catalog">
+        <div class="section-header">
+            <h2>Наша коллекция</h2>
+            <p class="section-subtitle">Вещи, созданные для особых моментов</p>
+        </div>
+
+        <div class="category-filters">
+            <button class="filter-btn active" data-filter="all">Все</button>
+            <button class="filter-btn" data-filter="dresses">Платья</button>
+            <button class="filter-btn" data-filter="suits">Костюмы</button>
+            <button class="filter-btn" data-filter="outerwear">Верхняя одежда</button>
+            <button class="filter-btn" data-filter="accessories">Аксессуары</button>
+        </div>
+
+        <div class="products-grid">
+            <div class="product-card" data-category="dresses">
+                <div class="product-image">
+                    <img src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Платье">
+                    <div class="product-overlay">
+                        <button class="quick-view">Быстрый просмотр</button>
+                    </div>
+                </div>
+                <div class="product-info">
+                    <h3>Шелковое платье</h3>
+                    <p class="product-category">Платья</p>
+                    <div class="product-footer">
+                        <span class="price">15 990 ₽</span>
+                        <button class="add-to-cart">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card" data-category="suits">
+                <div class="product-image">
+                    <img src="https://images.unsplash.com/photo-1509633773259-2350c99c09e2?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Костюм">
+                    <div class="product-overlay">
+                        <button class="quick-view">Быстрый просмотр</button>
+                    </div>
+                </div>
+                <div class="product-info">
+                    <h3>Женский костюм</h3>
+                    <p class="product-category">Костюмы</p>
+                    <div class="product-footer">
+                        <span class="price">24 990 ₽</span>
+                        <button class="add-to-cart">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card" data-category="outerwear">
+                <div class="product-image">
+                    <img src="https://images.unsplash.com/photo-1539533018447-63fcce2678e3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Пальто">
+                    <div class="product-overlay">
+                        <button class="quick-view">Быстрый просмотр</button>
+                    </div>
+                </div>
+                <div class="product-info">
+                    <h3>Кашемировое пальто</h3>
+                    <p class="product-category">Верхняя одежда</p>
+                    <div class="product-footer">
+                        <span class="price">45 990 ₽</span>
+                        <button class="add-to-cart">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card" data-category="accessories">
+                <div class="product-image">
+                    <img src="https://images.unsplash.com/photo-1584917865442-89b6a9c73f25?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Сумка">
+                    <div class="product-overlay">
+                        <button class="quick-view">Быстрый просмотр</button>
+                    </div>
+                </div>
+                <div class="product-info">
+                    <h3>Кожаная сумка</h3>
+                    <p class="product-category">Аксессуары</p>
+                    <div class="product-footer">
+                        <span class="price">12 990 ₽</span>
+                        <button class="add-to-cart">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="about" class="about">
+        <div class="about-content">
+            <div class="about-text">
+                <span class="section-tag">Наша история</span>
+                <h2>Искусство создания<br>премиальной одежды</h2>
+                <p>VELURA родился из любви к качественным материалам и безупречному крою. Каждая вещь создается с вниманием к деталям и уважением к традициям портновского искусства.</p>
+                <p>Мы используем только лучшие ткани от итальянских и французских производителей, а каждая модель проходит строгий контроль качества.</p>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-number">15+</span>
+                        <span class="stat-label">Лет опыта</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">5000+</span>
+                        <span class="stat-label">Довольных клиентов</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">100%</span>
+                        <span class="stat-label">Натуральные ткани</span>
+                    </div>
+                </div>
+            </div>
+            <div class="about-image">
+                <img src="https://images.unsplash.com/photo-1445205170230-053b83016050?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Atelier">
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="features-grid">
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c4a484" stroke-width="1.5">
+                        <path d="M20 12H4M12 4v16M4 12l8-8 8 8-8 8-8-8z"/>
+                    </svg>
+                </div>
+                <h3>Бесплатная доставка</h3>
+                <p>При заказе от 20 000 ₽</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c4a484" stroke-width="1.5">
+                        <rect x="2" y="7" width="20" height="14" rx="2"/>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                    </svg>
+                </div>
+                <h3>Примерка перед покупкой</h3>
+                <p>14 дней на возврат</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c4a484" stroke-width="1.5">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                </div>
+                <h3>Премиум качество</h3>
+                <p>Гарантия на все изделия</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="contact" class="contact">
+        <div class="contact-container">
+            <div class="contact-info">
+                <h2>Связаться с нами</h2>
+                <p>Ответим на все вопросы и поможем с выбором</p>
+
+                <div class="info-items">
+                    <div class="info-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c4a484" stroke-width="1.5">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <div>
+                            <h4>Шоурум</h4>
+                            <p>Москва, Столешников пер., 12</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c4a484" stroke-width="1.5">
+                            <rect x="2" y="2" width="20" height="20" rx="2.5"/>
+                            <path d="M7 7h10M7 12h10M7 17h6"/>
+                        </svg>
+                        <div>
+                            <h4>Email</h4>
+                            <p>info@velura.ru</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c4a484" stroke-width="1.5">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8 10a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.574 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        <div>
+                            <h4>Телефон</h4>
+                            <p>+7 (495) 123-45-67</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="social-links">
+                    <a href="#" class="social-link">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+                        </svg>
+                    </a>
+                    <a href="#" class="social-link">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="2" width="20" height="20" rx="5"/>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                        </svg>
+                    </a>
+                    <a href="#" class="social-link">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5 0-.28-.03-.56-.08-.83A7.72 7.72 0 0 0 23 3z"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <form class="contact-form">
+                <h3>Напишите нам</h3>
+                <div class="form-group">
+                    <input type="text" placeholder="Ваше имя" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <textarea placeholder="Ваше сообщение" rows="4" required></textarea>
+                </div>
+                <button type="submit" class="submit-btn">Отправить сообщение</button>
+            </form>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <a href="#" class="footer-logo">VELURA</a>
+                <p>Премиальная одежда для особых моментов</p>
+            </div>
+            <div class="footer-links">
+                <div class="footer-column">
+                    <h4>Каталог</h4>
+                    <ul>
+                        <li><a href="#">Новинки</a></li>
+                        <li><a href="#">Платья</a></li>
+                        <li><a href="#">Костюмы</a></li>
+                        <li><a href="#">Аксессуары</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h4>Покупателям</h4>
+                    <ul>
+                        <li><a href="#">Доставка</a></li>
+                        <li><a href="#">Оплата</a></li>
+                        <li><a href="#">Возврат</a></li>
+                        <li><a href="#">Размерная сетка</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 VELURA. Все права защищены.</p>
+        </div>
+    </footer>
+
+    <script src="index.js"></script>
+</body>
+</html>

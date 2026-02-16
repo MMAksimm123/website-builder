@@ -10,7 +10,7 @@
   fill: #B9FF66;
 }
 
-.buttonHeader {
+.buttonHeaderstart {
   height: 68px;
   width: 231px;
   background-color: transparent;
@@ -19,7 +19,7 @@
   border: 1px solid #191A23;
 }
 
-.buttonHeader:hover {
+.buttonHeaderstart:hover {
   background-color: #B9FF66;
   transition: background-color 0.35s;
 }

@@ -82,7 +82,7 @@ const CustomHeader = ({ createSitePath = "login" }: CustomHeaderProps) => {
         <img src={Logo} className='logoHeader'/>
         <button
           onClick={() => handleNavigate(navigate, createSitePath)}
-          className='buttonHeader'
+          className='buttonHeaderstart'
         >
           Создать сайт
         </button>
@@ -98,29 +98,69 @@ import { useNavigate } from 'react-router-dom';
 import '../../style/ExampleCards/ExampleCards.css';
 
 interface ExampleCardsProps {
-  image: string;
+  templateId: number;
+  name: string;
   templateData: { html: string; css: string; js: string };
 }
 
-const ExampleCards = ({ image, templateData }: ExampleCardsProps) => {
+const ExampleCards = ({ templateId, name, templateData }: ExampleCardsProps) => {
   const navigate = useNavigate();
 
   const handleTemplateSelect = () => {
-    navigate('/dev', { state: { initialCode: templateData } });
+    // Создаем уникальный ключ для каждого шаблона
+    const templateKey = `template_${templateId}_${Date.now()}`;
+
+    // Сохраняем данные шаблона в sessionStorage
+    sessionStorage.setItem(templateKey, JSON.stringify({
+      ...templateData,
+      name: name,
+      id: templateId
+    }));
+
+    // Передаем только ключ в state
+    navigate('/dev', {
+      state: {
+        templateKey: templateKey,
+        templateId: templateId
+      }
+    });
   };
 
   return (
     <div className='containerExample'>
-      <div className='containerImg'>
-        <img className='imgExample' src={image} alt="Пример" />
+      <div className='preview-container'>
+        <div className='preview-overlay' onClick={handleTemplateSelect}></div>
+        <iframe
+          srcDoc={`
+            <html>
+              <head>
+                <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    transform: scale(0.3);
+                    transform-origin: top left;
+                    width: 333.33%;
+                    height: 333.33%;
+                    overflow: hidden;
+                  }
+                  ${templateData.css}
+                </style>
+              </head>
+              <body>${templateData.html}</body>
+            </html>
+          `}
+          title={`preview-${templateId}`}
+          className='preview-iframe'
+          sandbox="allow-scripts"
+          scrolling="no"
+        />
       </div>
       <div className='description'>
-        <label className='textExample'>
-          Возьмите за основу этот макет, или переделайте его полностью под себя
-        </label>
+        <h3 className='template-name'>{name}</h3>
         <div className='containerBtn'>
           <button className='buttonHeader' onClick={handleTemplateSelect}>
-            Открыть макет
+            Использовать шаблон
           </button>
         </div>
       </div>
@@ -569,15 +609,18 @@ interface UserProject {
   updated_at: string;
 }
 
-const CACHE_TTL = 0.25 * 60 * 1000;
+const CACHE_TTL = 0.25 * 60 * 1000; // 15 секунд
 const getCacheKey = (userId: string) => `user_projects_${userId}`;
 
 const UserProgects = () => {
   const [projects, setProjects] = useState<UserProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const fetchProjects = useCallback(async (userId: string) => {
+    // Проверка кэша
     const cacheKey = getCacheKey(userId);
     const cachedData = localStorage.getItem(cacheKey);
     const cacheTime = localStorage.getItem(`${cacheKey}_time`);
@@ -586,6 +629,7 @@ const UserProgects = () => {
       return JSON.parse(cachedData) as UserProject[];
     }
 
+    // Запрос к базе данных
     const { data, error } = await supabase
       .from('user_projects')
       .select('id, name, updated_at')
@@ -597,6 +641,7 @@ const UserProgects = () => {
 
     const projectsData = data || [];
 
+    // Сохранение в кэш
     localStorage.setItem(cacheKey, JSON.stringify(projectsData));
     localStorage.setItem(`${cacheKey}_time`, Date.now().toString());
 
@@ -609,14 +654,20 @@ const UserProgects = () => {
     const loadData = async () => {
       try {
         setLoading(true);
+        setInitialLoading(true);
+        setError(null);
 
+        // Получение текущего пользователя
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (authError || !user) {
+        if (authError) throw authError;
+
+        if (!user) {
           navigate('/login');
           return;
         }
 
+        // Загрузка проектов
         const projectsData = await fetchProjects(user.id);
 
         if (isMounted) {
@@ -624,9 +675,18 @@ const UserProgects = () => {
         }
       } catch (err) {
         console.error('Ошибка при загрузке проектов:', err);
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Произошла ошибка при загрузке проектов');
+        }
       } finally {
         if (isMounted) {
           setLoading(false);
+          // Небольшая задержка для плавного исчезновения лоадера
+          setTimeout(() => {
+            if (isMounted) {
+              setInitialLoading(false);
+            }
+          }, 300);
         }
       }
     };
@@ -642,6 +702,27 @@ const UserProgects = () => {
     navigate(`/edit/${projectId}`);
   };
 
+  const handleRetry = () => {
+    setInitialLoading(true);
+    setError(null);
+    // Перезапуск загрузки данных
+    const loadData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const projectsData = await fetchProjects(user.id);
+          setProjects(projectsData);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Произошла ошибка при загрузке проектов');
+      } finally {
+        setLoading(false);
+        setInitialLoading(false);
+      }
+    };
+    loadData();
+  };
+
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {
@@ -653,25 +734,58 @@ const UserProgects = () => {
     });
   }, []);
 
-  if (loading) {
+  // Отображение ошибки
+  if (error) {
     return (
       <div className="listContainer">
         <h3>Ваши проекты</h3>
-        <div className="skeleton-loader">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="project-item-skeleton" />
-          ))}
+        <div className="error-container">
+          <div className="error-icon">⚠️</div>
+          <p className="error-message">{error}</p>
+          <button onClick={handleRetry} className="retry-button">
+            Попробовать снова
+          </button>
         </div>
       </div>
     );
   }
 
+  // Отображение загрузки
+  if (initialLoading) {
+    return (
+      <div className="listContainer">
+        <h3>Ваши проекты</h3>
+        <div className="loading-container">
+          <div className="loading-spinner">
+            <div className="spinner"></div>
+            <p>Загрузка проектов...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Основной рендер
   return (
     <div className="listContainer">
       <h3>Ваши проекты</h3>
       <div>
-        {projects.length === 0 ? (
-          <p>У вас пока нет проектов</p>
+        {loading ? (
+          <div className="skeleton-loader">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="project-item-skeleton" />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="empty-state">
+            <p>У вас пока нет проектов</p>
+            <button
+              onClick={() => navigate('/create')}
+              className="create-project-button"
+            >
+              Создать первый проект
+            </button>
+          </div>
         ) : (
           <ul className="projects-list">
             {projects.map((project) => (
@@ -680,12 +794,15 @@ const UserProgects = () => {
                 className="project-item"
                 onClick={() => handleProjectClick(project.id)}
               >
-                <div className="project-name">
-                  {project.name || `Проект ${project.id}`}
+                <div className="project-info">
+                  <div className="project-name">
+                    {project.name || `Проект ${project.id}`}
+                  </div>
+                  <div className="project-date">
+                    Обновлен: {formatDate(project.updated_at)}
+                  </div>
                 </div>
-                <div className="project-date">
-                  Обновлен: {formatDate(project.updated_at)}
-                </div>
+                <div className="project-arrow">→</div>
               </li>
             ))}
           </ul>
@@ -800,7 +917,7 @@ reportWebVitals();
 
 /src/panel/DevArea.tsx
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -817,19 +934,34 @@ const DEFAULT_TEMPLATE = {
   js: 'console.log("Hello world");'
 };
 
+type ViewportSize = 'desktop' | 'tablet' | 'mobile';
+
+const VIEWPORT_SIZES = {
+  desktop: { width: '100%', height: '100%', label: 'Десктоп' },
+  tablet: { width: '768px', height: '1024px', label: 'Планшет' },
+  mobile: { width: '375px', height: '667px', label: 'Мобильный' }
+};
+
 const DevArea = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
   const [code, setCode] = useState(DEFAULT_TEMPLATE);
   const [srcDoc, setSrcDoc] = useState('');
   const [userId, setUserId] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const editorRef = useRef<any>(null);
-  const navigate = useNavigate();
+  const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
+  const [templateName, setTemplateName] = useState<string>('Новый проект');
 
+  const editorRef = useRef<any>(null);
+
+  // Функция для монтирования редактора
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
   };
 
+  // Функция для вставки текста в редактор
   const insertTextAtCursor = (text: string) => {
     if (!editorRef.current) return;
 
@@ -848,10 +980,12 @@ const DevArea = () => {
     }]);
   };
 
+  // Обработчик загрузки изображения
   const handleImageUploaded = (image: { id: string; url: string; name: string }) => {
     console.log('Image uploaded:', image);
   };
 
+  // Обработчик вставки изображения
   const handleInsertImage = (url: string) => {
     if (activeTab === 'html') {
       const imgTag = `<img src="${url}" alt="Uploaded image" />`;
@@ -861,6 +995,7 @@ const DevArea = () => {
 
   useEffect(() => {
     const init = async () => {
+      // Проверка авторизации
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         navigate('/login');
@@ -868,20 +1003,58 @@ const DevArea = () => {
       }
       setUserId(user.id);
 
-      const template = await loadTemplateFiles(1);
-      if (template) {
-        setCode(template);
+      // Загрузка шаблона из sessionStorage если есть
+      const state = location.state as { templateKey?: string; templateId?: number } | null;
+
+      if (state?.templateKey) {
+        const savedTemplate = sessionStorage.getItem(state.templateKey);
+        if (savedTemplate) {
+          try {
+            const templateData = JSON.parse(savedTemplate);
+            setCode({
+              html: templateData.html || '',
+              css: templateData.css || '',
+              js: templateData.js || ''
+            });
+            setTemplateName(templateData.name || `Шаблон ${state.templateId}`);
+
+            // Очищаем sessionStorage после загрузки
+            sessionStorage.removeItem(state.templateKey);
+          } catch (error) {
+            console.error('Error loading template:', error);
+          }
+        }
+      } else {
+        // Если нет шаблона, загружаем дефолтный
+        const template = await loadTemplateFiles(1);
+        if (template) {
+          setCode(template);
+        }
       }
     };
 
     init();
-  }, [navigate]);
+  }, [location.state, navigate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setSrcDoc(`
         <html>
-          <head><style>${code.css}</style></head>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              /* Базовые стили для адаптивности */
+              * {
+                box-sizing: border-box;
+                max-width: 100%;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              ${code.css}
+            </style>
+          </head>
           <body>${code.html}<script>${code.js}</script></body>
         </html>
       `);
@@ -891,7 +1064,7 @@ const DevArea = () => {
   }, [code]);
 
   const handleSaveToCloud = useCallback(async () => {
-    const projectName = prompt('Название проекта:');
+    const projectName = prompt('Название проекта:', templateName);
     if (!projectName) return;
 
     setSaveStatus('saving');
@@ -912,22 +1085,22 @@ const DevArea = () => {
       if (error) throw error;
 
       setSaveStatus('saved');
-      setTimeout(() => navigate(`/edit/${data.id}`, {
-        state: { initialCode: code }
-      }), 1000);
+      setTimeout(() => navigate(`/edit/${data.id}`), 1000);
     } catch (error) {
       console.error('Save error:', error);
       setSaveStatus('idle');
     }
-  }, [code, userId, navigate]);
+  }, [code, userId, navigate, templateName]);
 
   const handleSaveToZip = useCallback(() => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
     zip.file("style.css", code.css);
-    zip.file("index.js", code.js);
-    zip.generateAsync({ type: "blob" }).then(saveAs);
-  }, [code]);
+    zip.file("script.js", code.js);
+    zip.generateAsync({ type: "blob" }).then((content) => {
+      saveAs(content, `${templateName.replace(/\s+/g, '_')}.zip`);
+    });
+  }, [code, templateName]);
 
   const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
     if (value !== undefined) {
@@ -935,61 +1108,122 @@ const DevArea = () => {
     }
   };
 
+  const getViewportStyle = () => {
+    const size = VIEWPORT_SIZES[viewportSize];
+    return {
+      maxWidth: size.width,
+      width: viewportSize === 'desktop' ? '100%' : size.width,
+      height: viewportSize === 'desktop' ? '100%' : size.height,
+      margin: '0 auto',
+      transition: 'all 0.3s ease'
+    };
+  };
+
   return (
     <div className="dev-area">
       <header className='headerPanelDev'>
         <Logo createSitePath='main'/>
+        <h2 className="project-title">{templateName}</h2>
         <LogoutButton />
       </header>
-      <div className="preview-pane">
-        <iframe
-          srcDoc={srcDoc}
-          title="preview"
-          sandbox="allow-scripts"
-          width="100%"
-          height="400px"
-        />
+
+      <div className="viewport-controls">
+        <div className="viewport-selector">
+          <button
+            className={`viewport-btn desktop ${viewportSize === 'desktop' ? 'active' : ''}`}
+            onClick={() => setViewportSize('desktop')}
+            title="Десктоп"
+          >
+            💻 Десктоп
+          </button>
+          <button
+            className={`viewport-btn tablet ${viewportSize === 'tablet' ? 'active' : ''}`}
+            onClick={() => setViewportSize('tablet')}
+            title="Планшет"
+          >
+            📱 Планшет
+          </button>
+          <button
+            className={`viewport-btn mobile ${viewportSize === 'mobile' ? 'active' : ''}`}
+            onClick={() => setViewportSize('mobile')}
+            title="Мобильный"
+          >
+            📱 Мобильный
+          </button>
+        </div>
       </div>
 
-      <div className="editor-container">
-        <div className="editor-header">
-          <div className="editor-tabs">
-            {(['html', 'css', 'js'] as const).map((tab) => (
-              <button
-                key={tab}
-                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <div className="save-buttons">
-            {/* <ImageUploader
-              onImageUploaded={handleImageUploaded}
-              onInsertImage={handleInsertImage}
-            /> */}
-            <button
-              className="save-btn cloud"
-              onClick={handleSaveToCloud}
-              disabled={saveStatus === 'saving'}
-            >
-              {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект'}
-            </button>
-            <button className="save-btn zip" onClick={handleSaveToZip}>
-              Сохранить в ZIP
-            </button>
+      <div className="main-content">
+        <div className="preview-section">
+          <div className="preview-container" style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#f0f0f0',
+            height: '100%',
+            padding: '20px'
+          }}>
+            <div style={getViewportStyle()}>
+              <iframe
+                srcDoc={srcDoc}
+                title="preview"
+                sandbox="allow-scripts allow-same-origin allow-forms"
+                width="100%"
+                height="100%"
+                style={{
+                  border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
+                  borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
+                  boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
+                  backgroundColor: 'white'
+                }}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="editor-content">
-          <Editor
-            height="400px"
-            language={activeTab}
-            value={code[activeTab]}
-            onChange={(value) => handleEditorChange(value, activeTab)}
-            onMount={handleEditorDidMount}
-          />
+        <div className="editor-section">
+          <div className="editor-header">
+            <div className="editor-tabs">
+              {(['html', 'css', 'js'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div className="save-buttons">
+              <button
+                className="save-btn cloud"
+                onClick={handleSaveToCloud}
+                disabled={saveStatus === 'saving'}
+              >
+                {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект'}
+              </button>
+              <button className="save-btn zip" onClick={handleSaveToZip}>
+                Сохранить в ZIP
+              </button>
+            </div>
+          </div>
+
+          <div className="editor-content">
+            <Editor
+              height="100%"
+              width="100%"
+              language={activeTab}
+              value={code[activeTab]}
+              onChange={(value) => handleEditorChange(value, activeTab)}
+              onMount={handleEditorDidMount}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                scrollBeyondLastLine: false,
+                automaticLayout: true
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -1017,85 +1251,67 @@ interface TemplateFiles {
   js: string;
 }
 
+type ViewportSize = 'desktop' | 'tablet' | 'mobile';
+
+const VIEWPORT_SIZES = {
+  desktop: { width: '100%', height: '100%', label: 'Десктоп' },
+  tablet: { width: '768px', height: '1024px', label: 'Планшет' },
+  mobile: { width: '375px', height: '667px', label: 'Мобильный' }
+};
+
 const SAVE_DEBOUNCE_DELAY = 2000;
 const AUTO_SAVE_ENABLED = true;
 
 const EditProject = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
   const [code, setCode] = useState<TemplateFiles>({ html: '', css: '', js: '' });
-  const [originalCode, setOriginalCode] = useState<TemplateFiles>({ html: '', css: '', js: '' });
   const [srcDoc, setSrcDoc] = useState('');
   const [projectName, setProjectName] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
+
   const editorRef = useRef<any>(null);
   let saveTimer: NodeJS.Timeout;
-
-  const handleEditorDidMount = (editor: any) => {
-    editorRef.current = editor;
-  };
-
-  const insertTextAtCursor = (text: string) => {
-    if (!editorRef.current) return;
-
-    const selection = editorRef.current.getSelection();
-    const range = {
-      startLineNumber: selection.startLineNumber,
-      startColumn: selection.startColumn,
-      endLineNumber: selection.endLineNumber,
-      endColumn: selection.endColumn
-    };
-
-    editorRef.current.executeEdits('insert-image', [{
-      range,
-      text: text,
-      forceMoveMarkers: true
-    }]);
-  };
-
-  const handleImageUploaded = (image: { id: string; url: string; name: string }) => {
-  console.log('Image uploaded:', image);
-};
-
-  const handleInsertImage = (url: string) => {
-    if (activeTab === 'html') {
-      const imgTag = `<img src="${url}" alt="Uploaded image" />`;
-      insertTextAtCursor(imgTag);
-    }
-  };
 
   useEffect(() => {
     const loadProject = async () => {
       try {
-        if (location.state?.initialCode) {
-          setCode(location.state.initialCode);
-          setOriginalCode(location.state.initialCode);
+        // Проверяем наличие initialCode в location.state (из DevArea)
+        const state = location.state as { initialCode?: TemplateFiles } | null;
+
+        if (state?.initialCode) {
+          setCode(state.initialCode);
+          setProjectName('Новый проект из шаблона');
           return;
         }
 
-        const { data } = await supabase
-          .from('user_projects')
-          .select('html, css, js, name')
-          .eq('id', id)
-          .single();
+        // Если нет initialCode, загружаем из базы данных
+        if (id) {
+          const { data } = await supabase
+            .from('user_projects')
+            .select('html, css, js, name')
+            .eq('id', id)
+            .single();
 
-        if (data) {
-          const projectData = {
-            html: data.html || '',
-            css: data.css || '',
-            js: data.js || ''
-          };
-          setCode(projectData);
-          setOriginalCode(projectData);
-          setProjectName(data.name || `Проект ${id}`);
+          if (data) {
+            const projectData = {
+              html: data.html || '',
+              css: data.css || '',
+              js: data.js || ''
+            };
+            setCode(projectData);
+            setProjectName(data.name || `Проект ${id}`);
+          }
         }
       } catch (error) {
         console.error('Project loading error:', error);
       }
     };
 
-    if (id) loadProject();
+    loadProject();
   }, [id, location.state]);
 
   const saveProject = useCallback(async (currentCode: TemplateFiles) => {
@@ -1116,7 +1332,6 @@ const EditProject = () => {
         .eq('id', id);
 
       if (!error) {
-        setOriginalCode(currentCode);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }
@@ -1132,7 +1347,7 @@ const EditProject = () => {
     const newCode = { ...code, [language]: value };
     setCode(newCode);
 
-    if (AUTO_SAVE_ENABLED) {
+    if (AUTO_SAVE_ENABLED && id) {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => saveProject(newCode), SAVE_DEBOUNCE_DELAY);
     }
@@ -1142,7 +1357,20 @@ const EditProject = () => {
     const timer = setTimeout(() => {
       setSrcDoc(`
         <html>
-          <head><style>${code.css}</style></head>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              * {
+                box-sizing: border-box;
+                max-width: 100%;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              ${code.css}
+            </style>
+          </head>
           <body>${code.html}<script>${code.js}</script></body>
         </html>
       `);
@@ -1155,64 +1383,137 @@ const EditProject = () => {
     const zip = new JSZip();
     zip.file("index.html", code.html);
     zip.file("style.css", code.css);
-    zip.file("index.js", code.js);
-    zip.generateAsync({ type: "blob" }).then(saveAs);
+    zip.file("script.js", code.js);
+    zip.generateAsync({ type: "blob" }).then((content) => {
+      saveAs(content, `${projectName.replace(/\s+/g, '_')}.zip`);
+    });
+  };
+
+  const getViewportStyle = () => {
+    const size = VIEWPORT_SIZES[viewportSize];
+    return {
+      maxWidth: size.width,
+      width: viewportSize === 'desktop' ? '100%' : size.width,
+      height: viewportSize === 'desktop' ? '100%' : size.height,
+      margin: '0 auto',
+      transition: 'all 0.3s ease'
+    };
   };
 
   return (
     <div className="dev-area">
       <header className='headerPanelDev'>
         <Logo createSitePath='main'/>
-        <h2>Редактирование: {projectName}</h2>
+        <h2 className="project-title">Редактирование: {projectName}</h2>
         <LogoutButton />
       </header>
-      <div className="preview-pane">
-        <iframe
-          srcDoc={srcDoc}
-          title="preview"
-          sandbox="allow-scripts"
-          width="100%"
-          height="400px"
-        />
+
+      <div className="viewport-controls">
+        <div className="viewport-selector">
+          <button
+            className={`viewport-btn desktop ${viewportSize === 'desktop' ? 'active' : ''}`}
+            onClick={() => setViewportSize('desktop')}
+            title="Десктоп"
+          >
+            💻 Десктоп
+          </button>
+          <button
+            className={`viewport-btn tablet ${viewportSize === 'tablet' ? 'active' : ''}`}
+            onClick={() => setViewportSize('tablet')}
+            title="Планшет"
+          >
+            📱 Планшет
+          </button>
+          <button
+            className={`viewport-btn mobile ${viewportSize === 'mobile' ? 'active' : ''}`}
+            onClick={() => setViewportSize('mobile')}
+            title="Мобильный"
+          >
+            📱 Мобильный
+          </button>
+        </div>
       </div>
 
-      <div className="editor-container">
-        <div className="editor-header">
-          <div className="editor-tabs">
-            {(['html', 'css', 'js'] as const).map((tab) => (
-              <button
-                key={tab}
-                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <div className="save-buttons">
-            <div className={`save-status ${saveStatus}`}>
-              {saveStatus === 'saving' ? 'Сохранение...' :
-               saveStatus === 'saved' ? 'Сохранено!' : ''}
+      <div className="main-content">
+        <div className="preview-section">
+          <div className="preview-container" style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#f0f0f0',
+            height: '100%',
+            padding: '20px'
+          }}>
+            <div style={getViewportStyle()}>
+              <iframe
+                srcDoc={srcDoc}
+                title="preview"
+                sandbox="allow-scripts allow-same-origin allow-forms"
+                width="100%"
+                height="100%"
+                style={{
+                  border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
+                  borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
+                  boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
+                  backgroundColor: 'white'
+                }}
+              />
             </div>
-            <ImageUploader
-              projectId={id}
-              onImageUploaded={handleImageUploaded}
-              onInsertImage={handleInsertImage}
-            />
-            <button className="save-btn zip" onClick={handleSaveToZip}>
-              Сохранить в ZIP
-            </button>
           </div>
         </div>
 
-        <div className="editor-content">
-          <Editor
-            height="400px"
-            language={activeTab}
-            value={code[activeTab]}
-            onChange={(value) => handleEditorChange(value, activeTab)}
-            onMount={handleEditorDidMount}
-          />
+        <div className="editor-section">
+          <div className="editor-header">
+            <div className="editor-tabs">
+              {(['html', 'css', 'js'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div className="save-buttons">
+              <div className={`save-status ${saveStatus}`}>
+                {saveStatus === 'saving' ? 'Сохранение...' :
+                 saveStatus === 'saved' ? 'Сохранено!' : ''}
+              </div>
+              <ImageUploader
+                projectId={id}
+                onImageUploaded={() => {}}
+                onInsertImage={(url) => {
+                  if (activeTab === 'html' && editorRef.current) {
+                    const imgTag = `<img src="${url}" alt="Uploaded image" />`;
+                    // Логика вставки изображения
+                  }
+                }}
+              />
+              <button className="save-btn zip" onClick={handleSaveToZip}>
+                Сохранить в ZIP
+              </button>
+            </div>
+          </div>
+
+          <div className="editor-content">
+            <Editor
+              height="100%"
+              width="100%"
+              language={activeTab}
+              value={code[activeTab]}
+              onChange={(value) => handleEditorChange(value, activeTab)}
+              onMount={(editor) => {
+                editorRef.current = editor;
+              }}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                scrollBeyondLastLine: false,
+                automaticLayout: true
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -1253,19 +1554,27 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../database/supabaseClient';
 import Logo from '../components/logo/Logo';
 import ExampleCards from '../components/exampleCards/ExampleCards';
-import exampleImg1 from '../picture/examplesWebsite/example.png';
 import '../style/MainPage/Main.css';
 import UserProgects from '../components/userProgects/UserProgects';
-import { loadTemplateFiles } from '../utils/loadTemplate';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
+
+interface Template {
+  id: number;
+  name: string;
+  path: string;
+  html: string;
+  css: string;
+  js: string;
+}
 
 function Main() {
   const [loading, setLoading] = useState(true);
-  const [template, setTemplate] = useState<{ html: string; css: string; js: string } | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchTemplates = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -1274,20 +1583,77 @@ function Main() {
           return;
         }
 
-        const templateData = await loadTemplateFiles(1);
-        setTemplate(templateData);
+        // Загружаем шаблоны из папок template1-4
+        const templateFolders = ['template1', 'template2', 'template3', 'template4'];
+        const loadedTemplates = await Promise.all(
+          templateFolders.map(async (folder, index) => {
+            try {
+              const htmlResponse = await fetch(`/template/${folder}/index.html`);
+              const cssResponse = await fetch(`/template/${folder}/style.css`);
+              const jsResponse = await fetch(`/template/${folder}/index.js`);
+
+              // Проверяем успешность загрузки
+              if (!htmlResponse.ok || !cssResponse.ok || !jsResponse.ok) {
+                console.warn(`Template ${folder} files not found`);
+                return null;
+              }
+
+              const html = await htmlResponse.text();
+              const css = await cssResponse.text();
+              const js = await jsResponse.text();
+
+              // Извлекаем название из HTML или используем имя папки
+              const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+              const name = titleMatch ? titleMatch[1] : `Шаблон ${index + 1}`;
+
+              return {
+                id: index + 1,
+                name: name,
+                path: folder,
+                html,
+                css,
+                js
+              };
+            } catch (error) {
+              console.error(`Error loading template ${folder}:`, error);
+              return null;
+            }
+          })
+        );
+
+        // Фильтруем успешно загруженные шаблоны
+        const validTemplates = loadedTemplates.filter(t => t !== null) as Template[];
+        setTemplates(validTemplates);
+
       } catch (err) {
-        console.error('Initial data loading error:', err);
-        navigate('/login');
+        console.error('Error loading templates:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchInitialData();
+    fetchTemplates();
   }, [navigate]);
 
-  if (loading) return <div>Loading...</div>;
+  // Фильтрация шаблонов по поиску
+  const filteredTemplates = templates.filter(template =>
+    template.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="main-container">
+        <header className='headerPanel'>
+          <Logo createSitePath='main'/>
+          <LogoutButton />
+        </header>
+        <div className="loading-templates">
+          <div className="spinner"></div>
+          <p>Загрузка шаблонов...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="main-container">
@@ -1295,17 +1661,56 @@ function Main() {
         <Logo createSitePath='main'/>
         <LogoutButton />
       </header>
+
       <div className='mainContainer'>
-        <div>
+        <div className="projects-section">
           <UserProgects />
         </div>
-        <div className='cardsExample'>
-          {template && (
-            <ExampleCards
-              image={exampleImg1}
-              templateData={template}
-            />
-          )}
+
+        <div className="templates-section">
+          <div className="templates-header">
+            <h2>Готовые шаблоны</h2>
+
+            <div className="templates-controls">
+              {/* Поиск */}
+              <div className="search-container">
+                <input
+                  type="text"
+                  placeholder="Поиск шаблонов..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Сетка шаблонов */}
+          <div className="templates-grid">
+            {filteredTemplates.length > 0 ? (
+              filteredTemplates.map(template => (
+                <ExampleCards
+                  key={template.id}
+                  templateId={template.id}
+                  name={template.name}
+                  templateData={{
+                    html: template.html,
+                    css: template.css,
+                    js: template.js
+                  }}
+                />
+              ))
+            ) : (
+              <div className="no-templates">
+                <p>Шаблоны не найдены</p>
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')}>
+                    Сбросить поиск
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1905,7 +2310,7 @@ import '@testing-library/jest-dom';
   fill: #B9FF66;
 }
 
-.buttonHeader {
+.buttonHeaderstart {
   height: 68px;
   width: 231px;
   background-color: transparent;
@@ -1914,7 +2319,7 @@ import '@testing-library/jest-dom';
   border: 1px solid #191A23;
 }
 
-.buttonHeader:hover {
+.buttonHeaderstart:hover {
   background-color: #B9FF66;
   transition: background-color 0.35s;
 }
@@ -1922,142 +2327,424 @@ import '@testing-library/jest-dom';
 
 /src/style/DevArea/DevArea.css
 .dev-area {
-  display: flex;
-  flex-direction: column;
   height: 100vh;
-}
-
-.preview-pane {
-  border-bottom: 1px solid #B9FF66 solid #ccc;
-}
-
-.editor-container {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.editor-tabs {
+.headerPanelDev {
   display: flex;
-  background: #f5f5f5;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: white;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
-.tab-btn {
-  padding: 10px 15px;
+.viewport-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.viewport-selector {
+  display: flex;
+  gap: 5px;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.viewport-btn {
+  padding: 8px 16px;
   border: none;
   background: none;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-.active {
-  background-color: #B9FF66;
+.viewport-btn:hover {
+  background-color: #f0f0f0;
 }
 
-.tab-button.active {
-  background: #ddd;
-  font-weight: bold;
+.viewport-btn.active {
+  background-color: #b9ff66;
+  color: #000;
 }
 
-.editor-content {
+.project-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.main-content {
+  display: flex;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
-iframe {
-  border: none;
+.preview-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e0e0e0;
+  min-width: 300px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.preview-container {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.preview-container > div {
+  height: 100%;
+}
+
+.preview-container iframe {
+  display: block;
+  transition: all 0.3s ease;
+}
+
+.editor-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  height: 100%;
+  overflow: hidden;
 }
 
 .editor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f5f5f5;
-  padding: 0 10px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
-.save-button {
+.editor-tabs {
+  display: flex;
+  gap: 5px;
+}
+
+.tab-btn {
   padding: 8px 16px;
-  background: #4CAF50;
-  color: white;
   border: none;
+  background: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  transition: all 0.2s ease;
 }
 
-.save-btn {
-  padding: 10px 15px;
-  border: 1px solid #B9FF66 solid #191A23;
-  border-radius: 14px;
-  cursor: pointer;
-  margin-left: 10px;
+.tab-btn:hover {
+  background-color: #e0e0e0;
 }
 
-.save-btn:hover {
-    background-color: #B9FF66;
-    transition: background-color 0.35s;
-}
-
-.save-button:hover {
-  background: #45a049;
-}
-
-.headerPanelDev {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  padding-right: 15px;
-  align-items: center;
-  border-bottom: 1px solid #B9FF66;
+.tab-btn.active {
+  background-color: #b9ff66;
+  color: #000;
 }
 
 .save-buttons {
   display: flex;
-  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+}
+
+.save-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.save-btn.cloud {
+  background-color: #007bff;
+  color: white;
+}
+
+.save-btn.cloud:hover {
+  background-color: #0056b3;
+}
+
+.save-btn.cloud:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.save-btn.zip {
+  background-color: #28a745;
+  color: white;
+}
+
+.save-btn.zip:hover {
+  background-color: #218838;
+}
+
+.save-status {
+  font-size: 14px;
+  color: #666;
+  min-width: 100px;
+  text-align: right;
+}
+
+.save-status.saving {
+  color: #007bff;
+}
+
+.save-status.saved {
+  color: #28a745;
+}
+
+.editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Стили для Monaco Editor */
+.monaco-editor {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .preview-section {
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    height: 50%;
+  }
+
+  .editor-section {
+    height: 50%;
+  }
+
+  .editor-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .save-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 768px) {
+  .viewport-selector {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .viewport-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .project-title {
+    font-size: 16px;
+  }
+
+  .save-buttons {
+    flex-wrap: wrap;
+  }
+
+  .save-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .save-status {
+    min-width: auto;
+  }
 }
 
 
 /src/style/ExampleCards/ExampleCards.css
 .containerExample {
-  max-width: 1050px;
-  height: 500px;
+  background: white;
+  border-radius: 12px;
   overflow: hidden;
-  border: 2px solid #B9FF66;
-  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
-  gap: 25px;
-  padding: 25px;
+  height: 100%;
+  border: 1px solid #eaeaea;
 }
 
-.containerImg {
-  display: flex;
-  justify-content: center;
+.containerExample:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-color: #b9ff66;
 }
 
-.imgExample {
-  width: 70%;
-  height: auto;
-  display: block;
-  align-items: center;
+.preview-container {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  background: #f8f9fa;
+  border-bottom: 1px solid #eaeaea;
 }
 
-.textExample {
-  font-family: 'Comfortaa', sans-serif;
-  text-align: center;
-  font-size: 25px;
+.preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+  background: white;
+}
+
+.preview-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 1;
+  cursor: pointer;
 }
 
 .description {
+  padding: 20px;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 10px;
+  background: white;
+}
+
+.template-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 15px;
+  line-height: 1.4;
 }
 
 .containerBtn {
-  display: flex;
-  justify-content: center;
+  margin-top: auto;
+}
+
+.buttonHeader {
+  width: 100%;
+  padding: 12px 20px;
+  background: white;
+  border: 2px solid #b9ff66;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.buttonHeader:hover {
+  background: #b9ff66;
+  transform: scale(1.02);
+}
+
+.buttonHeader:active {
+  transform: scale(0.98);
+}
+
+/* Стили для пустого состояния */
+.no-templates {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  color: #666;
+}
+
+.no-templates p {
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.no-templates button {
+  padding: 10px 24px;
+  background: #b9ff66;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.no-templates button:hover {
+  background: #a0e64d;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .preview-container {
+    height: 160px;
+  }
+
+  .description {
+    padding: 15px;
+  }
+
+  .template-name {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .buttonHeader {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .preview-container {
+    height: 140px;
+  }
+
+  .description {
+    padding: 12px;
+  }
+
+  .template-name {
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
 }
 
 
@@ -2289,27 +2976,343 @@ iframe {
 
 
 /src/style/MainPage/Main.css
-.cardsExample {
-  display: flex;
-  flex-direction: row;
-  grid-area: 10px;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.mainContainer {
-  display: flex;
-  flex-direction: row;
-  gap: 15px;
-  padding: 20px;
+.main-container {
+  min-height: 100vh;
+  background: #f5f5f5;
 }
 
 .headerPanel {
   display: flex;
-  flex-direction: row;
   justify-content: space-between;
-  padding-right: 15px;
   align-items: center;
+  padding: 15px 30px;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.mainContainer {
+  display: flex;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 30px;
+  gap: 35px;
+}
+
+.projects-section {
+  flex: 0 0 280px; /* Уменьшено с 300px до 280px */
+  min-width: 240px; /* Добавлена минимальная ширина */
+  max-width: 320px; /* Добавлена максимальная ширина */
+}
+
+.templates-section {
+  flex: 1;
+  min-width: 0; /* Предотвращает переполнение */
+}
+
+.templates-header {
+  margin-bottom: 30px;
+}
+
+.templates-header h2 {
+  font-size: 28px;
+  color: #333;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.templates-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.search-container {
+  width: 100%;
+}
+
+.search-input {
+  width: 97%;
+  padding: 14px 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #b9ff66;
+  box-shadow: 0 0 0 3px rgba(185, 255, 102, 0.2);
+}
+
+.search-input::placeholder {
+  color: #999;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 30px;
+  margin-top: 20px;
+}
+
+.loading-templates {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #b9ff66;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Стили для секции проектов */
+.projects-section .listContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.projects-section h3 {
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.projects-section .projects-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.projects-section .project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.projects-section .project-item:hover {
+  background: #f0f0f0;
+  border-color: #b9ff66;
+  transform: translateX(2px);
+}
+
+.projects-section .project-info {
+  flex: 1;
+  min-width: 0; /* Предотвращает переполнение */
+}
+
+.projects-section .project-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projects-section .project-date {
+  font-size: 12px;
+  color: #999;
+}
+
+.projects-section .project-arrow {
+  font-size: 18px;
+  color: #b9ff66;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.projects-section .project-item:hover .project-arrow {
+  opacity: 1;
+}
+
+.projects-section .empty-state {
+  text-align: center;
+  padding: 30px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.projects-section .create-project-button {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background: #b9ff66;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.projects-section .create-project-button:hover {
+  background: #a0e64d;
+}
+
+/* Адаптивность */
+@media (max-width: 1400px) {
+  .mainContainer {
+    padding: 25px;
+    gap: 25px;
+  }
+
+  .projects-section {
+    flex: 0 0 260px; /* Еще меньше на средних экранах */
+  }
+
+  .templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 25px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .mainContainer {
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .projects-section {
+    flex: 0 0 240px; /* Минимальный размер */
+  }
+
+  .templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+  }
+
+  .templates-header h2 {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 992px) {
+  .mainContainer {
+    flex-direction: column;
+  }
+
+  .projects-section {
+    flex: auto;
+    width: 100%;
+    max-width: 100%; /* На мобильных занимает всю ширину */
+  }
+
+  .projects-section .listContainer {
+    padding: 15px;
+  }
+
+  .projects-section .projects-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+
+  .templates-header h2 {
+    font-size: 22px;
+  }
+
+  .templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .headerPanel {
+    padding: 12px 20px;
+  }
+
+  .mainContainer {
+    padding: 15px;
+  }
+
+  .templates-header h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+  }
+
+  .search-input {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .templates-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .projects-section .projects-list {
+    grid-template-columns: 1fr; /* На маленьких экранах одна колонка */
+  }
+}
+
+@media (max-width: 480px) {
+  .headerPanel {
+    padding: 10px 15px;
+  }
+
+  .mainContainer {
+    padding: 10px;
+  }
+
+  .templates-header h2 {
+    font-size: 18px;
+  }
+
+  .search-input {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .projects-section .listContainer {
+    padding: 12px;
+  }
+
+  .projects-section h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .projects-section .project-item {
+    padding: 10px 12px;
+  }
+
+  .projects-section .project-name {
+    font-size: 14px;
+  }
+
+  .projects-section .project-date {
+    font-size: 11px;
+  }
 }
 
 
@@ -2389,6 +3392,61 @@ iframe {
   padding: 10px;
   background-color: #fde0e0;
   border-radius: 4px;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.loading-spinner {
+  text-align: center;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-spinner p {
+  color: #666;
+  margin: 0;
+  font-size: 14px;
+}
+
+.skeleton-loader {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-item-skeleton {
+  height: 70px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 

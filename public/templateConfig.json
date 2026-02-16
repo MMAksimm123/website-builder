@@ -1,0 +1,36 @@
+{
+  "templates": [
+    {
+      "id": "template1",
+      "name": "Макет 1 - Портфолио",
+      "preview": "/template/template1/preview.jpg",
+      "htmlPath": "/template/template1/index.html",
+      "cssPath": "/template/template1/style.css",
+      "jsPath": "/template/template1/index.js"
+    },
+    {
+      "id": "template2",
+      "name": "Макет 2 - Блог",
+      "preview": "/template/template2/preview.jpg",
+      "htmlPath": "/template/template2/index.html",
+      "cssPath": "/template/template2/style.css",
+      "jsPath": "/template/template2/index.js"
+    },
+    {
+      "id": "template3",
+      "name": "Макет 3 - Лендинг",
+      "preview": "/template/template3/preview.jpg",
+      "htmlPath": "/template/template3/index.html",
+      "cssPath": "/template/template3/style.css",
+      "jsPath": "/template/template3/index.js"
+    },
+    {
+      "id": "template4",
+      "name": "Макет 4 - Интернет-магазин",
+      "preview": "/template/template4/preview.jpg",
+      "htmlPath": "/template/template4/index.html",
+      "cssPath": "/template/template4/style.css",
+      "jsPath": "/template/template4/index.js"
+    }
+  ]
+}
