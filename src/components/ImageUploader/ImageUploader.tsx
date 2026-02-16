@@ -17,6 +17,14 @@ const ImageUploader = ({ projectId, onImageUploaded, onInsertImage }: ImageUploa
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Проверка размера файла (100кБ = 102400 байт)
+    const MAX_FILE_SIZE = 102400;
+    if (file.size > MAX_FILE_SIZE) {
+      alert('Размер файла не должен превышать 100кБ');
+      e.target.value = '';
+      return;
+    }
+
     setIsUploading(true);
     try {
       const uploadedImage = await uploadImage(file, projectId);
