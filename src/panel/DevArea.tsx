@@ -24,8 +24,38 @@ const VIEWPORT_SIZES = {
   mobile: { width: '375px', height: '667px', label: 'Мобильный' }
 };
 
-// Функция для создания HTML с изолированной обработкой якорных ссылок
+// Функция для создания HTML с изолированной обработкой якорных ссылок и скрытыми полосами прокрутки
 const createIsolatedHTML = (html: string, css: string, js: string) => {
+  // Добавляем стили для скрытия полос прокрутки, но сохранения функционала
+  const hideScrollbarStyles = `
+    <style>
+      /* Скрываем полосы прокрутки для всех браузеров */
+      html {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE and Edge */
+      }
+
+      html::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+      }
+
+      body {
+        overflow: auto; /* Сохраняем возможность прокрутки */
+        -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
+      }
+
+      /* Для элементов с прокруткой внутри */
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      *::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+  `;
+
   // Скрипт для правильной обработки якорных ссылок внутри iframe
   const anchorHandler = `
     <script>
@@ -127,6 +157,7 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="/">
+    ${hideScrollbarStyles}
     <style>
       /* Базовые стили для предпросмотра */
       * {
@@ -321,8 +352,7 @@ const DevArea = () => {
       width: viewportSize === 'desktop' ? '100%' : size.width,
       height: viewportSize === 'desktop' ? '100%' : size.height,
       margin: '0 auto',
-      transition: 'all 0.3s ease',
-      overflow: 'auto'
+      transition: 'all 0.3s ease'
     };
   };
 
@@ -369,9 +399,20 @@ const DevArea = () => {
             backgroundColor: '#f0f0f0',
             height: '100%',
             padding: '20px',
-            overflow: 'auto'
+            overflow: 'hidden'
           }}>
-            <div style={getViewportStyle()}>
+            <div style={{
+              ...getViewportStyle(),
+              overflow: 'auto', // Прокрутка сохраняется
+              scrollbarWidth: 'none', // Скрываем полосу в Firefox
+              msOverflowStyle: 'none', // Скрываем полосу в IE/Edge
+              // Скрываем полосу в Chrome/Safari через псевдоэлемент
+            }}>
+              <style>{`
+                div[style*="overflow: auto"]::-webkit-scrollbar {
+                  display: none;
+                }
+              `}</style>
               <iframe
                 key={iframeKey}
                 ref={iframeRef}
@@ -384,7 +425,8 @@ const DevArea = () => {
                   border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
                   boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  overflow: 'hidden' // Запрещаем прокрутку в iframe
                 }}
               />
             </div>

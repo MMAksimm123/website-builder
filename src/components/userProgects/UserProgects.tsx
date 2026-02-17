@@ -17,6 +17,9 @@ const UserProgects = () => {
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<UserProject | null>(null);
   const navigate = useNavigate();
 
   const fetchProjects = useCallback(async (userId: string) => {
@@ -100,6 +103,56 @@ const UserProgects = () => {
 
   const handleProjectClick = (projectId: number) => {
     navigate(`/edit/${projectId}`);
+  };
+
+  // Открытие модального окна подтверждения удаления
+  const handleDeleteClick = (e: React.MouseEvent, project: UserProject) => {
+    e.stopPropagation(); // Предотвращаем переход на страницу проекта
+    setProjectToDelete(project);
+    setShowDeleteModal(true);
+  };
+
+  // Закрытие модального окна
+  const handleCloseModal = () => {
+    setShowDeleteModal(false);
+    setProjectToDelete(null);
+  };
+
+  // Удаление проекта
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+
+    setDeletingId(projectToDelete.id);
+    setShowDeleteModal(false);
+
+    try {
+      const { error } = await supabase
+        .from('user_projects')
+        .delete()
+        .eq('id', projectToDelete.id);
+
+      if (error) throw error;
+
+      // Обновляем список проектов
+      setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+
+      // Очищаем кэш для текущего пользователя
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const cacheKey = getCacheKey(user.id);
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(`${cacheKey}_time`);
+      }
+
+      // Показываем уведомление об успешном удалении
+      alert('Проект успешно удален');
+    } catch (err) {
+      console.error('Ошибка при удалении проекта:', err);
+      alert('Произошла ошибка при удалении проекта');
+    } finally {
+      setDeletingId(null);
+      setProjectToDelete(null);
+    }
   };
 
   const handleRetry = () => {
@@ -191,10 +244,12 @@ const UserProgects = () => {
             {projects.map((project) => (
               <li
                 key={project.id}
-                className="project-item"
-                onClick={() => handleProjectClick(project.id)}
+                className={`project-item ${deletingId === project.id ? 'deleting' : ''}`}
               >
-                <div className="project-info">
+                <div
+                  className="project-info"
+                  onClick={() => handleProjectClick(project.id)}
+                >
                   <div className="project-name">
                     {project.name || `Проект ${project.id}`}
                   </div>
@@ -202,12 +257,51 @@ const UserProgects = () => {
                     Обновлен: {formatDate(project.updated_at)}
                   </div>
                 </div>
-                <div className="project-arrow">→</div>
+                <div className="project-actions">
+                  <button
+                    className="project-delete-btn"
+                    onClick={(e) => handleDeleteClick(e, project)}
+                    disabled={deletingId === project.id}
+                    title="Удалить проект"
+                  >
+                    {deletingId === project.id ? (
+                      <span className="deleting-spinner"></span>
+                    ) : (
+                      '🗑️'
+                    )}
+                  </button>
+                  <div className="project-arrow">→</div>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {/* Модальное окно подтверждения удаления */}
+      {showDeleteModal && projectToDelete && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>Подтверждение удаления</h3>
+            <p>Вы уверены, что хотите удалить проект "{projectToDelete.name || `Проект ${projectToDelete.id}`}"?</p>
+            <p className="modal-warning">Это действие нельзя отменить.</p>
+            <div className="modal-actions">
+              <button
+                onClick={handleConfirmDelete}
+                className="modal-delete-btn"
+              >
+                Удалить
+              </button>
+              <button
+                onClick={handleCloseModal}
+                className="modal-cancel-btn"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
