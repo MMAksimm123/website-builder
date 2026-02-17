@@ -1,64 +1,229 @@
 .borderWindow {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  max-width: 540px;
-  height: 320px;
-  border: solid 1px #191A23;
-  border-radius: 25px;
-  padding: 50px;
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  max-width: 450px;
+  width: 100%;
+  margin: 0 auto;
+  transition: transform 0.3s ease;
+}
+
+.borderWindow:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(185, 255, 102, 0.2);
+}
+
+.titleBlock {
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 10px 0;
+  text-align: center;
 }
 
 .areaInputs {
   display: flex;
   flex-direction: column;
-  gap: 25px;
+  gap: 15px;
+  margin: 30px 0;
 }
 
 .input {
-  width: 280px;
-  height: 30px;
   font-family: 'Comfortaa', sans-serif;
-  border: 1px solid #191A23;
-  border-radius: 15px;
-  padding: 5px;
+  padding: 15px 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: #f8f8f8;
 }
 
-.buttonLog {
-  height: 34px;
-  padding-left: 25px;
-  padding-right: 25px;
-  background-color: transparent;
-  font-family: 'Comfortaa', sans-serif;
-  border-radius: 14px;
-  border: 1px solid #191A23;
-  color: black;
+.input:focus {
+  outline: none;
+  border-color: #b9ff66;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(185, 255, 102, 0.2);
 }
 
-.buttonLog:hover {
-  background-color: #B9FF66;
-  transition: background-color 0.35s;
+.input::placeholder {
+  color: #999;
+  font-family: 'Comfortaa', sans-serif;
 }
 
 .buttonGroup {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  margin-top: 25px;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.buttonLog {
+  font-family: 'Comfortaa', sans-serif;
+  background: #b9ff66;
+  color: #333;
+  border: none;
+  border-radius: 12px;
+  padding: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 0 #8fcc4d;
+}
+
+.buttonLog:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #8fcc4d;
+  background: #c4ff7a;
+}
+
+.buttonLog:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #8fcc4d;
+}
+
+.buttonLog:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .link {
-  color: #41435a;
-  cursor: pointer;
+  font-family: 'Comfortaa', sans-serif;
+  color: #666;
+  text-decoration: none;
   font-size: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  padding: 5px;
 }
 
 .link:hover {
-  color: #B9FF66;
+  color: #b9ff66;
   text-decoration: underline;
-  transition: text-decoration 1.5s, color 0.3s;
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  padding: 15px;
+  border-radius: 12px;
+  margin: 20px 0;
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #c3e6cb;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 12px;
+  margin: 20px 0;
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #f5c6cb;
+}
+
+/* Социальная аутентификация */
+.social-divider {
+  display: flex;
+  align-items: center;
+  margin: 30px 0 20px;
+  gap: 15px;
+}
+
+.divider-line {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #b9ff66, transparent);
+}
+
+.divider-text {
+  font-family: 'Comfortaa', sans-serif;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.github-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 15px;
+  background: #24292e;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 0 #1b1f23;
+}
+
+.github-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #1b1f23;
+  background: #2f363d;
+}
+
+.github-button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #1b1f23;
+}
+
+.github-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.github-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .borderWindow {
+    padding: 30px 20px;
+    margin: 20px;
+  }
+
+  .titleBlock {
+    font-size: 28px;
+  }
+
+  .input {
+    padding: 12px 15px;
+    font-size: 15px;
+  }
+
+  .buttonLog {
+    padding: 12px;
+    font-size: 16px;
+  }
+}
+
+/* Анимация появления */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.borderWindow {
+  animation: slideUp 0.5s ease-out;
 }

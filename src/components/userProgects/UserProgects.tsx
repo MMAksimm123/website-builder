@@ -232,12 +232,6 @@ const UserProgects = () => {
         ) : projects.length === 0 ? (
           <div className="empty-state">
             <p>У вас пока нет проектов</p>
-            <button
-              onClick={() => navigate('/create')}
-              className="create-project-button"
-            >
-              Создать первый проект
-            </button>
           </div>
         ) : (
           <ul className="projects-list">

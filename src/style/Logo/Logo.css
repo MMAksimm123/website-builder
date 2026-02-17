@@ -1,6 +1,31 @@
+.containerLogo {
+  display: flex;
+  align-items: center;
+}
+
 .logoButton {
-  background-color: transparent;
+  background: none;
   border: none;
-  padding: 0;
   cursor: pointer;
+  padding: 0;
+  transition: transform 0.3s ease;
+}
+
+.logoButton:hover {
+  transform: scale(1.05);
+}
+
+.logoButton:active {
+  transform: scale(0.95);
+}
+
+.logoHeader {
+  height: 50px;
+  width: auto;
+}
+
+@media (max-width: 480px) {
+  .logoHeader {
+    height: 40px;
+  }
 }

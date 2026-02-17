@@ -1,25 +1,56 @@
 .headerLine {
   display: flex;
-  flex-direction: row;
   justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
 }
 
 .logoHeader {
-  max-width: 110px;
-  max-height: 110px;
-  fill: #B9FF66;
+  height: 50px;
+  width: auto;
+  transition: transform 0.3s ease;
+}
+
+.logoHeader:hover {
+  transform: scale(1.05);
 }
 
 .buttonHeaderstart {
-  height: 68px;
-  width: 231px;
-  background-color: transparent;
   font-family: 'Comfortaa', sans-serif;
-  border-radius: 14px;
-  border: 1px solid #191A23;
+  background: #b9ff66;
+  color: #333;
+  border: none;
+  border-radius: 30px;
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 0 #8fcc4d;
 }
 
 .buttonHeaderstart:hover {
-  background-color: #B9FF66;
-  transition: background-color 0.35s;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #8fcc4d;
+  background: #c4ff7a;
+}
+
+.buttonHeaderstart:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #8fcc4d;
+}
+
+@media (max-width: 768px) {
+  .headerLine {
+    padding: 15px 0;
+  }
+
+  .logoHeader {
+    height: 40px;
+  }
+
+  .buttonHeaderstart {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
 }
