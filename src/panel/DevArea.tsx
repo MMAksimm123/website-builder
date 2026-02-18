@@ -9,6 +9,8 @@ import { loadTemplateFiles } from '../utils/loadTemplate';
 import Logo from '../components/logo/Logo';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
 import ImageUploader from '../components/ImageUploader/ImageUploader';
+import GithubSetup from '../components/GithubSetup/GithubSetup';
+import GitHubClient from '../utils/github';
 
 const DEFAULT_TEMPLATE = {
   html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
@@ -209,6 +211,12 @@ const DevArea = () => {
   const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
   const [templateName, setTemplateName] = useState<string>('Новый проект');
   const [iframeKey, setIframeKey] = useState(Date.now());
+  const [showGithubModal, setShowGithubModal] = useState(false);
+  const [githubStatus, setGithubStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [githubError, setGithubError] = useState('');
+  const [githubRepo, setGithubRepo] = useState<string | null>(null);
+  const [githubToken, setGithubToken] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<number | null>(null);
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -286,6 +294,15 @@ const DevArea = () => {
           setCode(template);
         }
       }
+
+      // Загружаем GitHub настройки из localStorage
+      const savedGithubToken = localStorage.getItem(`github_token_${user.id}`);
+      const savedGithubRepo = localStorage.getItem(`github_repo_${user.id}`);
+
+      if (savedGithubToken && savedGithubRepo) {
+        setGithubToken(savedGithubToken);
+        setGithubRepo(savedGithubRepo);
+      }
     };
 
     init();
@@ -321,6 +338,7 @@ const DevArea = () => {
 
       if (error) throw error;
 
+      setProjectId(data.id);
       setSaveStatus('saved');
       setTimeout(() => navigate(`/edit/${data.id}`), 1000);
     } catch (error) {
@@ -356,13 +374,86 @@ const DevArea = () => {
     };
   };
 
+  const handleGithubSave = async (config: { token: string; repo: string; isPrivate: boolean }) => {
+    setGithubStatus('saving');
+    setGithubError('');
+    setShowGithubModal(false);
+
+    try {
+      const client = new GitHubClient(config.token, config.repo);
+
+      // Проверяем существование репозитория
+      const exists = await client.checkRepoExists();
+
+      if (!exists) {
+        // Создаем новый репозиторий
+        const repoName = config.repo.split('/')[1];
+        await client.createRepo(repoName, config.isPrivate);
+      }
+
+      // Загружаем файлы
+      await client.uploadProject(code, `Обновление: ${templateName}`);
+
+      // Получаем URL репозитория
+      const repoUrl = await client.getRepoUrl();
+
+      // Сохраняем настройки
+      localStorage.setItem(`github_token_${userId}`, config.token);
+      localStorage.setItem(`github_repo_${userId}`, config.repo);
+
+      setGithubToken(config.token);
+      setGithubRepo(config.repo);
+      setGithubStatus('success');
+
+      // Показываем ссылку на репозиторий
+      window.open(repoUrl, '_blank');
+
+      setTimeout(() => setGithubStatus('idle'), 3000);
+    } catch (error) {
+      console.error('GitHub save error:', error);
+      setGithubError(error instanceof Error ? error.message : 'Ошибка при сохранении на GitHub');
+      setGithubStatus('error');
+
+      setTimeout(() => setGithubStatus('idle'), 5000);
+    }
+  };
+
   return (
     <div className="dev-area">
       <header className='headerPanelDev'>
         <Logo createSitePath='main'/>
         <h2 className="project-title">{templateName}</h2>
-        <LogoutButton />
+        <div className="header-actions">
+          <button
+            className={`github-btn ${githubStatus}`}
+            onClick={() => setShowGithubModal(true)}
+            disabled={githubStatus === 'saving'}
+            title={githubRepo ? `Репозиторий: ${githubRepo}` : 'Опубликовать на GitHub'}
+          >
+            {githubStatus === 'saving' ? (
+              'Сохранение...'
+            ) : githubStatus === 'success' ? (
+              '✓ Сохранено'
+            ) : githubStatus === 'error' ? (
+              '❌ Ошибка'
+            ) : (
+              <>
+                <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20">
+                  <path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
+                </svg>
+                {githubRepo ? 'Обновить на GitHub' : 'Опубликовать на GitHub'}
+              </>
+            )}
+          </button>
+          <LogoutButton />
+        </div>
       </header>
+
+      {githubError && (
+        <div className="github-error-banner">
+          {githubError}
+        </div>
+      )}
 
       <div className="viewport-controls">
         <div className="viewport-selector">
@@ -452,7 +543,7 @@ const DevArea = () => {
                 onClick={handleSaveToCloud}
                 disabled={saveStatus === 'saving'}
               >
-                {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект'}
+                {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект в облако редактора кода'}
               </button>
               <button className="save-btn zip" onClick={handleSaveToZip}>
                 Сохранить в ZIP
@@ -478,6 +569,15 @@ const DevArea = () => {
           </div>
         </div>
       </div>
+
+      {showGithubModal && (
+        <GithubSetup
+          onSave={handleGithubSave}
+          onClose={() => setShowGithubModal(false)}
+          initialToken={githubToken || undefined}
+          initialRepo={githubRepo || undefined}
+        />
+      )}
     </div>
   );
 };

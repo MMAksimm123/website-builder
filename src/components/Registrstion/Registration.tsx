@@ -9,7 +9,7 @@ interface CustomLoginingProps {
   createPath?: string;
 }
 
-const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
+const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',

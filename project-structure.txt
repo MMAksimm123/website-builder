@@ -291,6 +291,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../database/supabaseClient';
 import '../../style/Logining/Logining.css';
 import { handleNavigate } from '../../functions/Navigate/Navigate';
+import { signInWithGitHub } from '../../database/socialAuth';
 
 interface CustomLoginingProps {
   createPath?: string;
@@ -307,6 +308,7 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
   const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleLogin = async (e: FormEvent) => {
@@ -331,6 +333,20 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
     }
   };
 
+  const handleGitHubLogin = async () => {
+    setGithubLoading(true);
+    setError('');
+
+    try {
+      const { error } = await signInWithGitHub();
+      if (error) throw error;
+      // Перенаправление произойдет автоматически через OAuth
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Ошибка при входе через GitHub');
+      setGithubLoading(false);
+    }
+  };
+
   return (
     <div className="borderWindow">
       <h3 className="titleBlock">Вход</h3>
@@ -340,6 +356,7 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
         </div>
       )}
       {error && <div className="error-message">{error}</div>}
+
       <form onSubmit={handleLogin}>
         <div className="areaInputs">
           <input
@@ -373,6 +390,29 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
           </a>
         </div>
       </form>
+
+      <div className="social-divider">
+        <span className="divider-line"></span>
+        <span className="divider-text">или</span>
+        <span className="divider-line"></span>
+      </div>
+
+      <button
+        onClick={handleGitHubLogin}
+        disabled={githubLoading}
+        className="github-button"
+      >
+        {githubLoading ? (
+          'Подключение к GitHub...'
+        ) : (
+          <>
+            <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
+            </svg>
+            Войти через GitHub
+          </>
+        )}
+      </button>
     </div>
   );
 };
@@ -461,12 +501,13 @@ import { useNavigate } from 'react-router-dom';
 import { handleNavigate } from '../../functions/Navigate/Navigate';
 import '../../style/Logining/Logining.css';
 import { supabase } from '../../database/supabaseClient';
+import { signInWithGitHub } from '../../database/socialAuth';
 
 interface CustomLoginingProps {
   createPath?: string;
 }
 
-const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
+const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -474,6 +515,7 @@ const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -535,10 +577,25 @@ const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
     }
   };
 
+  const handleGitHubSignUp = async () => {
+    setGithubLoading(true);
+    setError('');
+
+    try {
+      const { error } = await signInWithGitHub();
+      if (error) throw error;
+      // Перенаправление произойдет автоматически
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Ошибка при регистрации через GitHub');
+      setGithubLoading(false);
+    }
+  };
+
   return (
     <div className="borderWindow">
       <h3 className="titleBlock">Регистрация</h3>
       {error && <div className="error-message">{error}</div>}
+
       <form onSubmit={handleRegistration}>
         <div className="areaInputs">
           <input
@@ -590,6 +647,29 @@ const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
           </a>
         </div>
       </form>
+
+      <div className="social-divider">
+        <span className="divider-line"></span>
+        <span className="divider-text">или</span>
+        <span className="divider-line"></span>
+      </div>
+
+      <button
+        onClick={handleGitHubSignUp}
+        disabled={githubLoading}
+        className="github-button"
+      >
+        {githubLoading ? (
+          'Подключение к GitHub...'
+        ) : (
+          <>
+            <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
+            </svg>
+            Зарегистрироваться через GitHub
+          </>
+        )}
+      </button>
     </div>
   );
 };
@@ -832,12 +912,6 @@ const UserProgects = () => {
         ) : projects.length === 0 ? (
           <div className="empty-state">
             <p>У вас пока нет проектов</p>
-            <button
-              onClick={() => navigate('/create')}
-              className="create-project-button"
-            >
-              Создать первый проект
-            </button>
           </div>
         ) : (
           <ul className="projects-list">
@@ -928,6 +1002,51 @@ export const registerUser = async (email: string, password: string): Promise<{ d
 };
 
 
+/src/database/socialAuth.ts
+import { supabase } from './supabaseClient';
+
+export const signInWithGitHub = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      scopes: 'read:user user:email',
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
+  });
+
+  return { data, error };
+};
+
+export const signInWithGoogle = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
+  });
+
+  return { data, error };
+};
+
+export const getProviderAccountInfo = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('user_providers')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  return { data, error };
+};
+
+
 /src/database/supabaseClient.js
 import { createClient } from "@supabase/supabase-js";
 
@@ -984,6 +1103,7 @@ import RegistrationSystem from './panel/RegistrationSystem';
 import Main from './panel/Main';
 import DevArea from './panel/DevArea';
 import EditProgect from './panel/EditProgect';
+import AuthCallback from './panel/AuthCallback'; // Импортируем новый компонент
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -998,6 +1118,7 @@ root.render(
         <Route path='/main' element={<Main />} />
         <Route path='/dev' element={<DevArea />} />
         <Route path='/edit/:id' element={<EditProgect />} />
+        <Route path='/auth/callback' element={<AuthCallback />} /> {/* Новый маршрут */}
       </Routes>
     </Router>
   </React.StrictMode>
@@ -1008,6 +1129,51 @@ reportWebVitals();
 
 /src/logo.svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 841.9 595.3" height="100px" width="100px" transform="rotate(0) scale(1, 1)"><g fill="#b9ff66"><path d="M666.3 296.5c0-32.5-40.7-63.3-103.1-82.4 14.4-63.6 8-114.2-20.2-130.4-6.5-3.8-14.1-5.6-22.4-5.6v22.3c4.6 0 8.3.9 11.4 2.6 13.6 7.8 19.5 37.5 14.9 75.7-1.1 9.4-2.9 19.3-5.1 29.4-19.6-4.8-41-8.5-63.5-10.9-13.5-18.5-27.5-35.3-41.6-50 32.6-30.3 63.2-46.9 84-46.9V78c-27.5 0-63.5 19.6-99.9 53.6-36.4-33.8-72.4-53.2-99.9-53.2v22.3c20.7 0 51.4 16.5 84 46.6-14 14.7-28 31.4-41.3 49.9-22.6 2.4-44 6.1-63.6 11-2.3-10-4-19.7-5.2-29-4.7-38.2 1.1-67.9 14.6-75.8 3-1.8 6.9-2.6 11.5-2.6V78.5c-8.4 0-16 1.8-22.6 5.6-28.1 16.2-34.4 66.7-19.9 130.1-62.2 19.2-102.7 49.9-102.7 82.3 0 32.5 40.7 63.3 103.1 82.4-14.4 63.6-8 114.2 20.2 130.4 6.5 3.8 14.1 5.6 22.5 5.6 27.5 0 63.5-19.6 99.9-53.6 36.4 33.8 72.4 53.2 99.9 53.2 8.4 0 16-1.8 22.6-5.6 28.1-16.2 34.4-66.7 19.9-130.1 62-19.1 102.5-49.9 102.5-82.3zm-130.2-66.7c-3.7 12.9-8.3 26.2-13.5 39.5-4.1-8-8.4-16-13.1-24-4.6-8-9.5-15.8-14.4-23.4 14.2 2.1 27.9 4.7 41 7.9zm-45.8 106.5c-7.8 13.5-15.8 26.3-24.1 38.2-14.9 1.3-30 2-45.2 2-15.1 0-30.2-.7-45-1.9-8.3-11.9-16.4-24.6-24.2-38-7.6-13.1-14.5-26.4-20.8-39.8 6.2-13.4 13.2-26.8 20.7-39.9 7.8-13.5 15.8-26.3 24.1-38.2 14.9-1.3 30-2 45.2-2 15.1 0 30.2.7 45 1.9 8.3 11.9 16.4 24.6 24.2 38 7.6 13.1 14.5 26.4 20.8 39.8-6.3 13.4-13.2 26.8-20.7 39.9zm32.3-13c5.4 13.4 10 26.8 13.8 39.8-13.1 3.2-26.9 5.9-41.2 8 4.9-7.7 9.8-15.6 14.4-23.7 4.6-8 8.9-16.1 13-24.1zM421.2 430c-9.3-9.6-18.6-20.3-27.8-32 9 .4 18.2.7 27.5.7 9.4 0 18.7-.2 27.8-.7-9 11.7-18.3 22.4-27.5 32zm-74.4-58.9c-14.2-2.1-27.9-4.7-41-7.9 3.7-12.9 8.3-26.2 13.5-39.5 4.1 8 8.4 16 13.1 24 4.7 8 9.5 15.8 14.4 23.4zM420.7 163c9.3 9.6 18.6 20.3 27.8 32-9-.4-18.2-.7-27.5-.7-9.4 0-18.7.2-27.8.7 9-11.7 18.3-22.4 27.5-32zm-74 58.9c-4.9 7.7-9.8 15.6-14.4 23.7-4.6 8-8.9 16-13 24-5.4-13.4-10-26.8-13.8-39.8 13.1-3.1 26.9-5.8 41.2-7.9zm-90.5 125.2c-35.4-15.1-58.3-34.9-58.3-50.6 0-15.7 22.9-35.6 58.3-50.6 8.6-3.7 18-7 27.7-10.1 5.7 19.6 13.2 40 22.5 60.9-9.2 20.8-16.6 41.1-22.2 60.6-9.9-3.1-19.3-6.5-28-10.2zM310 490c-13.6-7.8-19.5-37.5-14.9-75.7 1.1-9.4 2.9-19.3 5.1-29.4 19.6 4.8 41 8.5 63.5 10.9 13.5 18.5 27.5 35.3 41.6 50-32.6 30.3-63.2 46.9-84 46.9-4.5-.1-8.3-1-11.3-2.7zm237.2-76.2c4.7 38.2-1.1 67.9-14.6 75.8-3 1.8-6.9 2.6-11.5 2.6-20.7 0-51.4-16.5-84-46.6 14-14.7 28-31.4 41.3-49.9 22.6-2.4 44-6.1 63.6-11 2.3 10.1 4.1 19.8 5.2 29.1zm38.5-66.7c-8.6 3.7-18 7-27.7 10.1-5.7-19.6-13.2-40-22.5-60.9 9.2-20.8 16.6-41.1 22.2-60.6 9.9 3.1 19.3 6.5 28.1 10.2 35.4 15.1 58.3 34.9 58.3 50.6-.1 15.7-23 35.6-58.4 50.6zM320.8 78.4z"/><circle cx="420.9" cy="296.5" r="45.7"/><path d="M520.5 78.1z"/></g></svg>
+
+/src/panel/AuthCallback.tsx
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../database/supabaseClient';
+import '../style/AuthCallback/AuthCallback.css';
+
+const AuthCallback = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error('Auth callback error:', error);
+        navigate('/login');
+        return;
+      }
+
+      if (session) {
+        // Небольшая задержка для плавности
+        setTimeout(() => {
+          navigate('/main');
+        }, 1000);
+      } else {
+        navigate('/login');
+      }
+    };
+
+    handleAuthCallback();
+  }, [navigate]);
+
+  return (
+    <div className="auth-callback-container">
+      <div className="loading-card">
+        <div className="spinner"></div>
+        <p className="loading-text">Завершение аутентификации...</p>
+      </div>
+    </div>
+  );
+};
+
+export default AuthCallback;
+
 
 /src/panel/DevArea.tsx
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -2757,31 +2923,168 @@ export default reportWebVitals;
 import '@testing-library/jest-dom';
 
 
+/src/style/AuthCallback/AuthCallback.css
+.auth-callback-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
+  min-height: 100vh;
+  width: 100%;
+}
+
+.loading-card {
+  background: white;
+  border-radius: 20px;
+  padding: 50px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 25px;
+  max-width: 400px;
+  width: 90%;
+  margin: 0 auto;
+  animation: slideUp 0.5s ease-out;
+  transition: transform 0.3s ease;
+}
+
+.loading-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(185, 255, 102, 0.2);
+}
+
+.spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #b9ff66;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-family: 'Comfortaa', sans-serif;
+  color: #333;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  text-align: center;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+  .loading-card {
+    padding: 40px 30px;
+    width: 85%;
+  }
+
+  .spinner {
+    width: 50px;
+    height: 50px;
+  }
+
+  .loading-text {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .loading-card {
+    padding: 30px 20px;
+    width: 90%;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+  }
+
+  .loading-text {
+    font-size: 15px;
+  }
+}
+
+
 /src/style/customHeader/customHeader.css
 .headerLine {
   display: flex;
-  flex-direction: row;
   justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
 }
 
 .logoHeader {
-  max-width: 110px;
-  max-height: 110px;
-  fill: #B9FF66;
+  height: 50px;
+  width: auto;
+  transition: transform 0.3s ease;
+}
+
+.logoHeader:hover {
+  transform: scale(1.05);
 }
 
 .buttonHeaderstart {
-  height: 68px;
-  width: 231px;
-  background-color: transparent;
   font-family: 'Comfortaa', sans-serif;
-  border-radius: 14px;
-  border: 1px solid #191A23;
+  background: #b9ff66;
+  color: #333;
+  border: none;
+  border-radius: 30px;
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 0 #8fcc4d;
 }
 
 .buttonHeaderstart:hover {
-  background-color: #B9FF66;
-  transition: background-color 0.35s;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #8fcc4d;
+  background: #c4ff7a;
+}
+
+.buttonHeaderstart:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #8fcc4d;
+}
+
+@media (max-width: 768px) {
+  .headerLine {
+    padding: 15px 0;
+  }
+
+  .logoHeader {
+    height: 40px;
+  }
+
+  .buttonHeaderstart {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
 }
 
 
@@ -3335,68 +3638,233 @@ import '@testing-library/jest-dom';
 
 /src/style/Logining/Logining.css
 .borderWindow {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  max-width: 540px;
-  height: 320px;
-  border: solid 1px #191A23;
-  border-radius: 25px;
-  padding: 50px;
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  max-width: 450px;
+  width: 100%;
+  margin: 0 auto;
+  transition: transform 0.3s ease;
+}
+
+.borderWindow:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(185, 255, 102, 0.2);
+}
+
+.titleBlock {
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 10px 0;
+  text-align: center;
 }
 
 .areaInputs {
   display: flex;
   flex-direction: column;
-  gap: 25px;
+  gap: 15px;
+  margin: 30px 0;
 }
 
 .input {
-  width: 280px;
-  height: 30px;
   font-family: 'Comfortaa', sans-serif;
-  border: 1px solid #191A23;
-  border-radius: 15px;
-  padding: 5px;
+  padding: 15px 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: #f8f8f8;
 }
 
-.buttonLog {
-  height: 34px;
-  padding-left: 25px;
-  padding-right: 25px;
-  background-color: transparent;
-  font-family: 'Comfortaa', sans-serif;
-  border-radius: 14px;
-  border: 1px solid #191A23;
-  color: black;
+.input:focus {
+  outline: none;
+  border-color: #b9ff66;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(185, 255, 102, 0.2);
 }
 
-.buttonLog:hover {
-  background-color: #B9FF66;
-  transition: background-color 0.35s;
+.input::placeholder {
+  color: #999;
+  font-family: 'Comfortaa', sans-serif;
 }
 
 .buttonGroup {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  margin-top: 25px;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.buttonLog {
+  font-family: 'Comfortaa', sans-serif;
+  background: #b9ff66;
+  color: #333;
+  border: none;
+  border-radius: 12px;
+  padding: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 0 #8fcc4d;
+}
+
+.buttonLog:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #8fcc4d;
+  background: #c4ff7a;
+}
+
+.buttonLog:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #8fcc4d;
+}
+
+.buttonLog:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .link {
-  color: #41435a;
-  cursor: pointer;
+  font-family: 'Comfortaa', sans-serif;
+  color: #666;
+  text-decoration: none;
   font-size: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  padding: 5px;
 }
 
 .link:hover {
-  color: #B9FF66;
+  color: #b9ff66;
   text-decoration: underline;
-  transition: text-decoration 1.5s, color 0.3s;
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  padding: 15px;
+  border-radius: 12px;
+  margin: 20px 0;
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #c3e6cb;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 12px;
+  margin: 20px 0;
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #f5c6cb;
+}
+
+/* Социальная аутентификация */
+.social-divider {
+  display: flex;
+  align-items: center;
+  margin: 30px 0 20px;
+  gap: 15px;
+}
+
+.divider-line {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #b9ff66, transparent);
+}
+
+.divider-text {
+  font-family: 'Comfortaa', sans-serif;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.github-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 15px;
+  background: #24292e;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 0 #1b1f23;
+}
+
+.github-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #1b1f23;
+  background: #2f363d;
+}
+
+.github-button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #1b1f23;
+}
+
+.github-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.github-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .borderWindow {
+    padding: 30px 20px;
+    margin: 20px;
+  }
+
+  .titleBlock {
+    font-size: 28px;
+  }
+
+  .input {
+    padding: 12px 15px;
+    font-size: 15px;
+  }
+
+  .buttonLog {
+    padding: 12px;
+    font-size: 16px;
+  }
+}
+
+/* Анимация появления */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.borderWindow {
+  animation: slideUp 0.5s ease-out;
 }
 
 
@@ -3404,16 +3872,92 @@ import '@testing-library/jest-dom';
 .container {
   display: flex;
   justify-content: center;
-  width: 540px;
+  align-items: center;
+  min-height: calc(100vh - 200px);
+  padding: 20px;
+}
+
+/* Стили для App контейнера */
+.App {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
+}
+
+.head {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.App-header {
+  width: 90%;
+  max-width: 1200px;
+}
+
+.main {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+/* Дополнительные стили для улучшения внешнего вида */
+.logoHeader {
+  transition: transform 0.3s ease;
+  height: 50px;
+  width: auto;
+}
+
+.logoHeader:hover {
+  transform: scale(1.05);
+}
+
+/* Адаптивность */
+@media (max-width: 480px) {
+  .container {
+    min-height: calc(100vh - 150px);
+  }
+
+  .head {
+    padding: 15px 0;
+  }
+
+  .logoHeader {
+    height: 40px;
+  }
 }
 
 
 /src/style/Logo/Logo.css
+.containerLogo {
+  display: flex;
+  align-items: center;
+}
+
 .logoButton {
-  background-color: transparent;
+  background: none;
   border: none;
-  padding: 0;
   cursor: pointer;
+  padding: 0;
+  transition: transform 0.3s ease;
+}
+
+.logoButton:hover {
+  transform: scale(1.05);
+}
+
+.logoButton:active {
+  transform: scale(0.95);
+}
+
+.logoHeader {
+  height: 50px;
+  width: auto;
+}
+
+@media (max-width: 480px) {
+  .logoHeader {
+    height: 40px;
+  }
 }
 
 
