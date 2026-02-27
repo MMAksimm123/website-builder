@@ -11,10 +11,26 @@ interface User {
   full_name?: string;
   avatar_url?: string;
   created_at: string;
+  userType: 'user'; // для email/password пользователей
 }
+
+interface OAuthUser {
+  id: number;
+  provider: string;
+  providerId: string;
+  email?: string;
+  full_name?: string;
+  avatar_url?: string;
+  created_at: string;
+  userType: 'oauth'; // для OAuth пользователей
+}
+
+type UserProfile = User | OAuthUser;
 
 interface Project {
   id: number;
+  ownerType: 'user' | 'oauth';
+  ownerId: number;
   name: string;
   html?: string;
   css?: string;
@@ -26,8 +42,9 @@ interface Project {
 }
 
 interface AuthResponse {
-  user: User;
+  user: UserProfile;
   token: string;
+  userType: 'user' | 'oauth';
 }
 
 interface ProjectsResponse {

@@ -11,9 +11,11 @@ const AuthCallback = () => {
     const handleAuthCallback = async () => {
       const params = new URLSearchParams(location.search);
       const token = params.get('token');
+      const userType = params.get('userType');
       const error = params.get('error');
 
       console.log('Auth callback - token:', token ? 'получен' : 'не получен');
+      console.log('Auth callback - userType:', userType);
       console.log('Auth callback - error:', error);
 
       if (error) {
