@@ -1,33 +1,42 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../database/supabaseClient';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { api } from '../services/api';
 import '../style/AuthCallback/AuthCallback.css';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const params = new URLSearchParams(location.search);
+      const token = params.get('token');
+      const error = params.get('error');
+
+      console.log('Auth callback - token:', token ? 'получен' : 'не получен');
+      console.log('Auth callback - error:', error);
 
       if (error) {
         console.error('Auth callback error:', error);
-        navigate('/login');
+        navigate('/login?error=auth_failed');
         return;
       }
 
-      if (session) {
-        // Небольшая задержка для плавности
+      if (token) {
+        api.setToken(token);
+        console.log('Токен сохранен, перенаправление на /main');
+
         setTimeout(() => {
           navigate('/main');
         }, 1000);
       } else {
+        console.log('Токен не получен, перенаправление на /login');
         navigate('/login');
       }
     };
 
     handleAuthCallback();
-  }, [navigate]);
+  }, [navigate, location]);
 
   return (
     <div className="auth-callback-container">

@@ -5,6 +5,7 @@
 /.pnp
 .pnp.js
 project-structure.txt
+.env
 
 # testing
 /coverage

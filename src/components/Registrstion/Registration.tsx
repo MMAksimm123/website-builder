@@ -2,14 +2,15 @@ import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleNavigate } from '../../functions/Navigate/Navigate';
 import '../../style/Logining/Logining.css';
-import { supabase } from '../../database/supabaseClient';
-import { signInWithGitHub } from '../../database/socialAuth';
+import { api } from '../../services/api';
 
 interface CustomLoginingProps {
   createPath?: string;
 }
 
-const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -46,18 +47,9 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
     }
 
     try {
-      const { error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: '',
-            avatar_url: ''
-          }
-        }
-      });
+      const { data, error } = await api.register(formData.email, formData.password);
 
-      if (authError) throw authError;
+      if (error) throw new Error(error);
 
       navigate(createPath, {
         state: {
@@ -65,30 +57,21 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
           email: formData.email
         }
       });
-
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message.includes('User already registered')
-          ? 'Пользователь с таким email уже зарегистрирован'
-          : error.message);
-      } else {
-        setError('Произошла неизвестная ошибка при регистрации');
-      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Ошибка при регистрации');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGitHubSignUp = async () => {
+  const handleGitHubSignUp = () => {
     setGithubLoading(true);
     setError('');
 
     try {
-      const { error } = await signInWithGitHub();
-      if (error) throw error;
-      // Перенаправление произойдет автоматически
+      window.location.href = `${API_URL}/api/auth/github`;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Ошибка при регистрации через GitHub');
+      setError('Ошибка при регистрации через GitHub');
       setGithubLoading(false);
     }
   };
@@ -136,7 +119,6 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
             className="buttonLog"
             type="submit"
             disabled={loading || !formData.email || !formData.password || !formData.confirmPassword}
-            aria-busy={loading}
           >
             {loading ? 'Регистрация...' : 'Зарегистрироваться'}
           </button>

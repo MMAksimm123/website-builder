@@ -3,7 +3,7 @@ import { UploadedImage, uploadImage } from '../../utils/uploadImage';
 import '../../style/ImageUploader/ImageUploader.css'
 
 interface ImageUploaderProps {
-  projectId?: string;
+  projectId?: string | number;
   onImageUploaded?: (image: UploadedImage) => void;
   onInsertImage?: (url: string) => void;
 }
@@ -27,7 +27,9 @@ const ImageUploader = ({ projectId, onImageUploaded, onInsertImage }: ImageUploa
 
     setIsUploading(true);
     try {
-      const uploadedImage = await uploadImage(file, projectId);
+      const projectIdStr = projectId ? projectId.toString() : undefined;
+      const uploadedImage = await uploadImage(file, projectIdStr);
+
       setImageUrl(uploadedImage.url);
       setShowModal(true);
 
@@ -86,14 +88,14 @@ const ImageUploader = ({ projectId, onImageUploaded, onInsertImage }: ImageUploa
               </button>
             </div>
             <div className="modal-actions">
-              {/* {onInsertImage && (
+              {onInsertImage && (
                 <button
                   onClick={handleInsert}
                   className="insert-button"
                 >
                   Вставить в редактор
                 </button>
-              )} */}
+              )}
               <button
                 onClick={() => setShowModal(false)}
                 className="close-button"

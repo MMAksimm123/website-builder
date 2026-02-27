@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../database/supabaseClient';
 import '../../style/UserProgects/UserProjects.css';
+import { api } from '../../services/api';
 
 interface UserProject {
   id: number;
@@ -9,7 +9,7 @@ interface UserProject {
   updated_at: string;
 }
 
-const CACHE_TTL = 0.25 * 60 * 1000; // 15 секунд
+const CACHE_TTL = 0.25 * 60 * 1000;
 const getCacheKey = (userId: string) => `user_projects_${userId}`;
 
 const UserProgects = () => {
@@ -22,33 +22,15 @@ const UserProgects = () => {
   const [projectToDelete, setProjectToDelete] = useState<UserProject | null>(null);
   const navigate = useNavigate();
 
-  const fetchProjects = useCallback(async (userId: string) => {
-    // Проверка кэша
-    const cacheKey = getCacheKey(userId);
-    const cachedData = localStorage.getItem(cacheKey);
-    const cacheTime = localStorage.getItem(`${cacheKey}_time`);
-
-    if (cachedData && cacheTime && Date.now() - parseInt(cacheTime) < CACHE_TTL) {
-      return JSON.parse(cachedData) as UserProject[];
+  const fetchProjects = useCallback(async () => {
+    const token = api.getToken();
+    if (!token) {
+      throw new Error('No token');
     }
 
-    // Запрос к базе данных
-    const { data, error } = await supabase
-      .from('user_projects')
-      .select('id, name, updated_at')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
-      .range(0, 9);
-
-    if (error) throw error;
-
-    const projectsData = data || [];
-
-    // Сохранение в кэш
-    localStorage.setItem(cacheKey, JSON.stringify(projectsData));
-    localStorage.setItem(`${cacheKey}_time`, Date.now().toString());
-
-    return projectsData;
+    const { data, error } = await api.getProjects();
+    if (error) throw new Error(error);
+    return data?.projects || [];
   }, []);
 
   useEffect(() => {
@@ -60,18 +42,20 @@ const UserProgects = () => {
         setInitialLoading(true);
         setError(null);
 
-        // Получение текущего пользователя
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError) throw authError;
-
-        if (!user) {
+        const token = api.getToken();
+        if (!token) {
           navigate('/login');
           return;
         }
 
-        // Загрузка проектов
-        const projectsData = await fetchProjects(user.id);
+        const { data: userData, error: userError } = await api.getCurrentUser();
+        if (userError || !userData?.user) {
+          api.clearToken();
+          navigate('/login');
+          return;
+        }
+
+        const projectsData = await fetchProjects();
 
         if (isMounted) {
           setProjects(projectsData);
@@ -84,7 +68,6 @@ const UserProgects = () => {
       } finally {
         if (isMounted) {
           setLoading(false);
-          // Небольшая задержка для плавного исчезновения лоадера
           setTimeout(() => {
             if (isMounted) {
               setInitialLoading(false);
@@ -105,20 +88,17 @@ const UserProgects = () => {
     navigate(`/edit/${projectId}`);
   };
 
-  // Открытие модального окна подтверждения удаления
   const handleDeleteClick = (e: React.MouseEvent, project: UserProject) => {
-    e.stopPropagation(); // Предотвращаем переход на страницу проекта
+    e.stopPropagation();
     setProjectToDelete(project);
     setShowDeleteModal(true);
   };
 
-  // Закрытие модального окна
   const handleCloseModal = () => {
     setShowDeleteModal(false);
     setProjectToDelete(null);
   };
 
-  // Удаление проекта
   const handleConfirmDelete = async () => {
     if (!projectToDelete) return;
 
@@ -126,25 +106,10 @@ const UserProgects = () => {
     setShowDeleteModal(false);
 
     try {
-      const { error } = await supabase
-        .from('user_projects')
-        .delete()
-        .eq('id', projectToDelete.id);
+      const { error } = await api.deleteProject(projectToDelete.id.toString());
+      if (error) throw new Error(error);
 
-      if (error) throw error;
-
-      // Обновляем список проектов
       setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
-
-      // Очищаем кэш для текущего пользователя
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const cacheKey = getCacheKey(user.id);
-        localStorage.removeItem(cacheKey);
-        localStorage.removeItem(`${cacheKey}_time`);
-      }
-
-      // Показываем уведомление об успешном удалении
       alert('Проект успешно удален');
     } catch (err) {
       console.error('Ошибка при удалении проекта:', err);
@@ -158,14 +123,10 @@ const UserProgects = () => {
   const handleRetry = () => {
     setInitialLoading(true);
     setError(null);
-    // Перезапуск загрузки данных
     const loadData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const projectsData = await fetchProjects(user.id);
-          setProjects(projectsData);
-        }
+        const projectsData = await fetchProjects();
+        setProjects(projectsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Произошла ошибка при загрузке проектов');
       } finally {
@@ -187,7 +148,6 @@ const UserProgects = () => {
     });
   }, []);
 
-  // Отображение ошибки
   if (error) {
     return (
       <div className="listContainer">
@@ -203,7 +163,6 @@ const UserProgects = () => {
     );
   }
 
-  // Отображение загрузки
   if (initialLoading) {
     return (
       <div className="listContainer">
@@ -218,7 +177,6 @@ const UserProgects = () => {
     );
   }
 
-  // Основной рендер
   return (
     <div className="listContainer">
       <h3>Ваши проекты</h3>
@@ -272,7 +230,6 @@ const UserProgects = () => {
         )}
       </div>
 
-      {/* Модальное окно подтверждения удаления */}
       {showDeleteModal && projectToDelete && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>

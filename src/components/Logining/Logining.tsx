@@ -1,9 +1,8 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../database/supabaseClient';
 import '../../style/Logining/Logining.css';
 import { handleNavigate } from '../../functions/Navigate/Navigate';
-import { signInWithGitHub } from '../../database/socialAuth';
+import { api } from '../../services/api';
 
 interface CustomLoginingProps {
   createPath?: string;
@@ -13,6 +12,8 @@ interface LocationState {
   email?: string;
   registrationSuccess?: boolean;
 }
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
   const navigate = useNavigate();
@@ -29,15 +30,15 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
     setError('');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      const { data, error } = await api.login(email, password);
 
-      if (error) throw error;
+      if (error) throw new Error(error);
+
+      if (data?.token) {
+        api.setToken(data.token);
+      }
 
       navigate('/main');
-
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Ошибка при входе');
     } finally {
@@ -45,16 +46,14 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
     }
   };
 
-  const handleGitHubLogin = async () => {
+  const handleGitHubLogin = () => {
     setGithubLoading(true);
     setError('');
 
     try {
-      const { error } = await signInWithGitHub();
-      if (error) throw error;
-      // Перенаправление произойдет автоматически через OAuth
+      window.location.href = `${API_URL}/api/auth/github`;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Ошибка при входе через GitHub');
+      setError('Ошибка при входе через GitHub');
       setGithubLoading(false);
     }
   };

@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { supabase } from '../database/supabaseClient';
 import '../style/DevArea/DevArea.css';
 import Logo from '../components/logo/Logo';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
 import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
+import { api } from '../services/api';
 
 interface TemplateFiles {
   html: string;
@@ -28,50 +28,37 @@ const VIEWPORT_SIZES = {
 const SAVE_DEBOUNCE_DELAY = 2000;
 const AUTO_SAVE_ENABLED = true;
 
-// Функция для создания HTML с изолированной обработкой якорных ссылок и скрытыми полосами прокрутки
 const createIsolatedHTML = (html: string, css: string, js: string) => {
-  // Добавляем стили для скрытия полос прокрутки, но сохранения функционала
   const hideScrollbarStyles = `
     <style>
-      /* Скрываем полосы прокрутки для всех браузеров */
       html {
-        scrollbar-width: none; /* Firefox */
-        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
       }
-
       html::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
+        display: none;
       }
-
       body {
-        overflow: auto; /* Сохраняем возможность прокрутки */
-        -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
       }
-
-      /* Для элементов с прокруткой внутри */
       * {
         scrollbar-width: none;
         -ms-overflow-style: none;
       }
-
       *::-webkit-scrollbar {
         display: none;
       }
     </style>
   `;
 
-  // Скрипт для правильной обработки якорных ссылок внутри iframe
   const anchorHandler = `
     <script>
       (function() {
-        // Функция для прокрутки к элементу по якорю
         function scrollToAnchor(hash) {
           if (!hash || hash === '#') return;
-
-          // Убираем символ # для поиска элемента
           const targetId = hash.substring(1);
           const targetElement = document.getElementById(targetId);
-
           if (targetElement) {
             targetElement.scrollIntoView({
               behavior: 'smooth',
@@ -79,81 +66,50 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             });
           }
         }
-
-        // Перехватываем клики по ссылкам с якорями
         document.addEventListener('click', function(e) {
           const link = e.target.closest('a');
           if (!link || !link.hash) return;
-
-          // Проверяем, является ли ссылка якорной (начинается с #)
           if (link.hash.startsWith('#')) {
             e.preventDefault();
-
-            // Получаем только хеш часть
             const hash = link.hash;
-
-            // Прокручиваем к элементу
             scrollToAnchor(hash);
-
-            // Обновляем хеш в URL iframe (без перезагрузки страницы)
             if (window.location.hash !== hash) {
               history.replaceState(null, '', hash);
             }
-
-            console.log('Anchor navigation:', hash);
             return false;
           }
         });
-
-        // Обрабатываем начальный хеш при загрузке
         if (window.location.hash) {
           setTimeout(() => {
             scrollToAnchor(window.location.hash);
           }, 100);
         }
-
-        // Перехватываем изменения хеша
         window.addEventListener('hashchange', function(e) {
           e.preventDefault();
           scrollToAnchor(window.location.hash);
         });
-
-        // Переопределяем pushState для предотвращения изменения родительского URL
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
-
         history.pushState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Для обычных URL предотвращаем навигацию
-          console.log('Navigation prevented in preview mode');
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
-
         history.replaceState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Для обычных URL предотвращаем навигацию
-          console.log('Navigation prevented in preview mode');
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
-
-        console.log('Anchor links isolation enabled for preview iframe');
       })();
     </script>
   `;
 
-  // Собираем полный HTML с правильной структурой
   return `
 <!DOCTYPE html>
 <html>
@@ -163,7 +119,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <base href="/">
     ${hideScrollbarStyles}
     <style>
-      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -172,8 +127,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
-
-      /* Стили пользователя */
       ${css}
     </style>
     ${anchorHandler}
@@ -181,14 +134,9 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
   <body>
     ${html}
     <script>
-      // Пользовательский JavaScript
       ${js}
-
-      // Дополнительный код для эмуляции работы якорей
       (function() {
-        // Если есть обработчики на window.onhashchange, сохраняем их
         const originalOnHashChange = window.onhashchange;
-
         window.onhashchange = function(e) {
           if (originalOnHashChange) {
             originalOnHashChange.call(this, e);
@@ -203,7 +151,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
 
 const EditProject = () => {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
@@ -218,136 +165,66 @@ const EditProject = () => {
   const [githubError, setGithubError] = useState('');
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   let saveTimer: NodeJS.Timeout;
 
-  // Загрузка GitHub настроек из БД
-  const loadGithubSettings = useCallback(async (projectId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_projects')
-        .select('github_repo, github_token, github_last_sync')
-        .eq('id', projectId)
-        .single();
-
-      if (error) throw error;
-
-      if (data?.github_repo) {
-        setGithubRepo(data.github_repo);
-      }
-
-      if (data?.github_token) {
-        // В реальном проекте токен должен быть зашифрован!
-        setGithubToken(data.github_token);
-      }
-    } catch (error) {
-      console.error('Error loading GitHub settings:', error);
-    }
-  }, []);
-
-  // Сохранение GitHub настроек в БД
-  const saveGithubSettings = useCallback(async (projectId: string, repo: string, token: string) => {
-    try {
-      // Внимание: В реальном проекте токен должен быть зашифрован перед сохранением!
-      // Это упрощенный вариант для демонстрации
-      const { error } = await supabase
-        .from('user_projects')
-        .update({
-          github_repo: repo,
-          github_token: token, // НЕ ДЕЛАЙТЕ ТАК В РЕАЛЬНОМ ПРОЕКТЕ!
-          github_last_sync: new Date().toISOString()
-        })
-        .eq('id', projectId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error saving GitHub settings:', error);
-      throw error;
-    }
-  }, []);
-
-  // Обновление времени последней синхронизации
-  const updateLastSync = useCallback(async (projectId: string) => {
-    try {
-      await supabase
-        .from('user_projects')
-        .update({
-          github_last_sync: new Date().toISOString()
-        })
-        .eq('id', projectId);
-    } catch (error) {
-      console.error('Error updating last sync:', error);
-    }
-  }, []);
-
-  // Обновление iframe с изолированным контентом
   const updateIframeContent = useCallback(() => {
     const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
     setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now()); // Обновляем ключ для перезагрузки iframe
+    setIframeKey(Date.now());
   }, [code]);
 
   useEffect(() => {
     const loadProject = async () => {
       setIsLoading(true);
       try {
-        // Получаем текущего пользователя
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        const token = api.getToken();
+        if (!token) {
           navigate('/login');
           return;
         }
-        setUserId(user.id);
 
-        const state = location.state as { initialCode?: TemplateFiles } | null;
-
-        if (state?.initialCode) {
-          setCode(state.initialCode);
-          setProjectName('Новый проект из шаблона');
-          setIsLoading(false);
+        const { data: userData, error: userError } = await api.getCurrentUser();
+        if (userError || !userData?.user) {
+          api.clearToken();
+          navigate('/login');
           return;
         }
 
-        if (id) {
-          const { data, error } = await supabase
-            .from('user_projects')
-            .select('html, css, js, name, github_repo, github_token, github_last_sync')
-            .eq('id', id)
-            .single();
+        if (!id) {
+          navigate('/main');
+          return;
+        }
 
-          if (error) throw error;
+        const { data, error } = await api.getProject(id);
 
-          if (data) {
-            const projectData = {
-              html: data.html || '',
-              css: data.css || '',
-              js: data.js || ''
-            };
-            setCode(projectData);
-            setProjectName(data.name || `Проект ${id}`);
+        if (error) throw new Error(error);
+        if (!data?.project) throw new Error('Project not found');
 
-            // Загружаем GitHub настройки
-            if (data.github_repo) {
-              setGithubRepo(data.github_repo);
-            }
-            if (data.github_token) {
-              setGithubToken(data.github_token);
-            }
-          }
+        const project = data.project;
+        setCode({
+          html: project.html || '',
+          css: project.css || '',
+          js: project.js || ''
+        });
+        setProjectName(project.name || `Проект ${id}`);
+
+        if (project.github_repo) {
+          setGithubRepo(project.github_repo);
         }
       } catch (error) {
         console.error('Project loading error:', error);
+        navigate('/main');
       } finally {
         setIsLoading(false);
       }
     };
 
     loadProject();
-  }, [id, location.state, navigate]);
+  }, [id, navigate]);
 
   const saveProject = useCallback(async (currentCode: TemplateFiles) => {
     if (!id || !AUTO_SAVE_ENABLED) return;
@@ -356,16 +233,7 @@ const EditProject = () => {
     clearTimeout(saveTimer);
 
     try {
-      const { error } = await supabase
-        .from('user_projects')
-        .update({
-          html: currentCode.html,
-          css: currentCode.css,
-          js: currentCode.js,
-          updated_at: new Date()
-        })
-        .eq('id', id);
-
+      const { error } = await api.updateProject(id, currentCode);
       if (!error) {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
@@ -388,7 +256,6 @@ const EditProject = () => {
     }
   };
 
-  // Обновляем iframe при изменении кода с debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       updateIframeContent();
@@ -418,7 +285,6 @@ const EditProject = () => {
     };
   };
 
-  // Функция для вставки текста в редактор
   const insertTextAtCursor = (text: string) => {
     if (!editorRef.current) return;
 
@@ -451,41 +317,29 @@ const EditProject = () => {
 
     try {
       const client = new GitHubClient(config.token, config.repo);
-
-      // Проверяем существование репозитория
       const exists = await client.checkRepoExists();
 
       if (!exists) {
-        // Создаем новый репозиторий
         const repoName = config.repo.split('/')[1];
         await client.createRepo(repoName, config.isPrivate);
       }
 
-      // Загружаем файлы
       await client.uploadProject(code, `Обновление: ${projectName}`);
-
-      // Получаем URL репозитория
       const repoUrl = await client.getRepoUrl();
 
-      // Сохраняем настройки в БД
-      await saveGithubSettings(id, config.repo, config.token);
+      const { error } = await api.saveGithubSettings(id, config.repo, config.token);
+      if (error) throw new Error(error);
 
       setGithubRepo(config.repo);
       setGithubToken(config.token);
       setGithubStatus('success');
 
-      // Обновляем время последней синхронизации
-      await updateLastSync(id);
-
-      // Показываем ссылку на репозиторий
       window.open(repoUrl, '_blank');
-
       setTimeout(() => setGithubStatus('idle'), 3000);
     } catch (error) {
       console.error('GitHub save error:', error);
       setGithubError(error instanceof Error ? error.message : 'Ошибка при сохранении на GitHub');
       setGithubStatus('error');
-
       setTimeout(() => setGithubStatus('idle'), 5000);
     }
   };
@@ -596,9 +450,9 @@ const EditProject = () => {
           }}>
             <div style={{
               ...getViewportStyle(),
-              overflow: 'auto', // Прокрутка сохраняется
-              scrollbarWidth: 'none', // Скрываем полосу в Firefox
-              msOverflowStyle: 'none', // Скрываем полосу в IE/Edge
+              overflow: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
             }}>
               <style>{`
                 div[style*="overflow: auto"]::-webkit-scrollbar {
@@ -618,7 +472,7 @@ const EditProject = () => {
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
                   boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
                   backgroundColor: 'white',
-                  overflow: 'hidden' // Запрещаем прокрутку в iframe
+                  overflow: 'hidden'
                 }}
               />
             </div>

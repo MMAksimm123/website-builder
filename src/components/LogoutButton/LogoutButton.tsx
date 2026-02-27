@@ -1,14 +1,13 @@
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../database/supabaseClient';
 import '../../style/LogoutButton/LogoutButton.css';
+import { api } from '../../services/api';
 
 const LogoutButton = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      api.logout();
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);

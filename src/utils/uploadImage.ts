@@ -1,10 +1,12 @@
 import { supabase } from "../database/supabaseClient";
+import { api } from "../services/api";
 
 export interface UploadedImage {
-  id: string;
+  id: string; // Изменено с string | number на string
   url: string;
   name: string;
   projectId?: string;
+  storagePath?: string;
 }
 
 export const uploadImage = async (file: File, projectId?: string): Promise<UploadedImage> => {
@@ -28,26 +30,24 @@ export const uploadImage = async (file: File, projectId?: string): Promise<Uploa
       .from('project-images')
       .getPublicUrl(fileName);
 
-    const { data: imageData, error: dbError } = await supabase
-      .from('portfolio_images')
-      .insert({
-        project_id: projectId,
-        user_id: user.id,
-        storage_path: `project-images/${fileName}`,
-        file_name: file.name,
-        file_size: file.size,
-        content_type: file.type
-      })
-      .select('id, project_id')
-      .single();
+    const { data, error } = await api.saveImageInfo({
+      projectId: projectId,
+      fileName: file.name,
+      fileSize: file.size,
+      contentType: file.type,
+      storagePath: fileName,
+      supabaseUrl: publicUrl
+    });
 
-    if (dbError) throw dbError;
+    if (error) throw new Error(error);
+    if (!data?.image) throw new Error('Failed to save image info');
 
     return {
-      id: imageData.id,
-      url: publicUrl,
-      name: file.name,
-      projectId: imageData.project_id
+      id: data.image.id.toString(), // Конвертируем в строку
+      url: data.image.url,
+      name: data.image.name,
+      projectId: data.image.projectId,
+      storagePath: fileName
     };
   } catch (error) {
     console.error('Upload error:', error);

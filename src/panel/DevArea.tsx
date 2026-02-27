@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { supabase } from '../database/supabaseClient';
 import '../style/DevArea/DevArea.css';
 import { loadTemplateFiles } from '../utils/loadTemplate';
 import Logo from '../components/logo/Logo';
@@ -11,6 +10,7 @@ import LogoutButton from '../components/LogoutButton/LogoutButton';
 import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
+import { api } from '../services/api';
 
 const DEFAULT_TEMPLATE = {
   html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
@@ -26,50 +26,37 @@ const VIEWPORT_SIZES = {
   mobile: { width: '375px', height: '667px', label: 'Мобильный' }
 };
 
-// Функция для создания HTML с изолированной обработкой якорных ссылок и скрытыми полосами прокрутки
 const createIsolatedHTML = (html: string, css: string, js: string) => {
-  // Добавляем стили для скрытия полос прокрутки, но сохранения функционала
   const hideScrollbarStyles = `
     <style>
-      /* Скрываем полосы прокрутки для всех браузеров */
       html {
-        scrollbar-width: none; /* Firefox */
-        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
       }
-
       html::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
+        display: none;
       }
-
       body {
-        overflow: auto; /* Сохраняем возможность прокрутки */
-        -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
       }
-
-      /* Для элементов с прокруткой внутри */
       * {
         scrollbar-width: none;
         -ms-overflow-style: none;
       }
-
       *::-webkit-scrollbar {
         display: none;
       }
     </style>
   `;
 
-  // Скрипт для правильной обработки якорных ссылок внутри iframe
   const anchorHandler = `
     <script>
       (function() {
-        // Функция для прокрутки к элементу по якорю
         function scrollToAnchor(hash) {
           if (!hash || hash === '#') return;
-
-          // Убираем символ # для поиска элемента
           const targetId = hash.substring(1);
           const targetElement = document.getElementById(targetId);
-
           if (targetElement) {
             targetElement.scrollIntoView({
               behavior: 'smooth',
@@ -77,81 +64,54 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             });
           }
         }
-
-        // Перехватываем клики по ссылкам с якорями
         document.addEventListener('click', function(e) {
           const link = e.target.closest('a');
           if (!link || !link.hash) return;
-
-          // Проверяем, является ли ссылка якорной (начинается с #)
           if (link.hash.startsWith('#')) {
             e.preventDefault();
-
-            // Получаем только хеш часть
             const hash = link.hash;
-
-            // Прокручиваем к элементу
             scrollToAnchor(hash);
-
-            // Обновляем хеш в URL iframe (без перезагрузки страницы)
             if (window.location.hash !== hash) {
               history.replaceState(null, '', hash);
             }
-
             console.log('Anchor navigation:', hash);
             return false;
           }
         });
-
-        // Обрабатываем начальный хеш при загрузке
         if (window.location.hash) {
           setTimeout(() => {
             scrollToAnchor(window.location.hash);
           }, 100);
         }
-
-        // Перехватываем изменения хеша
         window.addEventListener('hashchange', function(e) {
           e.preventDefault();
           scrollToAnchor(window.location.hash);
         });
-
-        // Переопределяем pushState для предотвращения изменения родительского URL
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
-
         history.pushState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Для обычных URL предотвращаем навигацию
           console.log('Navigation prevented in preview mode');
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
-
         history.replaceState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Для обычных URL предотвращаем навигацию
           console.log('Navigation prevented in preview mode');
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
-
         console.log('Anchor links isolation enabled for preview iframe');
       })();
     </script>
   `;
 
-  // Собираем полный HTML с правильной структурой
   return `
 <!DOCTYPE html>
 <html>
@@ -161,7 +121,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <base href="/">
     ${hideScrollbarStyles}
     <style>
-      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -170,8 +129,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
-
-      /* Стили пользователя */
       ${css}
     </style>
     ${anchorHandler}
@@ -179,14 +136,9 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
   <body>
     ${html}
     <script>
-      // Пользовательский JavaScript
       ${js}
-
-      // Дополнительный код для эмуляции работы якорей
       (function() {
-        // Если есть обработчики на window.onhashchange, сохраняем их
         const originalOnHashChange = window.onhashchange;
-
         window.onhashchange = function(e) {
           if (originalOnHashChange) {
             originalOnHashChange.call(this, e);
@@ -206,7 +158,6 @@ const DevArea = () => {
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
   const [code, setCode] = useState(DEFAULT_TEMPLATE);
   const [srcDoc, setSrcDoc] = useState('');
-  const [userId, setUserId] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
   const [templateName, setTemplateName] = useState<string>('Новый проект');
@@ -254,21 +205,26 @@ const DevArea = () => {
     }
   };
 
-  // Обновление iframe с изолированным контентом
   const updateIframeContent = useCallback(() => {
     const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
     setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now()); // Обновляем ключ для перезагрузки iframe
+    setIframeKey(Date.now());
   }, [code]);
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = api.getToken();
+      if (!token) {
         navigate('/login');
         return;
       }
-      setUserId(user.id);
+
+      const { data: userData, error: userError } = await api.getCurrentUser();
+      if (userError || !userData?.user) {
+        api.clearToken();
+        navigate('/login');
+        return;
+      }
 
       const state = location.state as { templateKey?: string; templateId?: number } | null;
 
@@ -294,21 +250,11 @@ const DevArea = () => {
           setCode(template);
         }
       }
-
-      // Загружаем GitHub настройки из localStorage
-      const savedGithubToken = localStorage.getItem(`github_token_${user.id}`);
-      const savedGithubRepo = localStorage.getItem(`github_repo_${user.id}`);
-
-      if (savedGithubToken && savedGithubRepo) {
-        setGithubToken(savedGithubToken);
-        setGithubRepo(savedGithubRepo);
-      }
     };
 
     init();
   }, [location.state, navigate]);
 
-  // Обновляем iframe при изменении кода с debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       updateIframeContent();
@@ -323,29 +269,24 @@ const DevArea = () => {
 
     setSaveStatus('saving');
     try {
-      const { data, error } = await supabase
-        .from('user_projects')
-        .insert({
-          user_id: userId,
-          name: projectName,
-          html: code.html,
-          css: code.css,
-          js: code.js,
-          updated_at: new Date()
-        })
-        .select()
-        .single();
+      const { data, error } = await api.createProject(
+        projectName,
+        code.html,
+        code.css,
+        code.js
+      );
 
-      if (error) throw error;
+      if (error) throw new Error(error);
+      if (!data?.project) throw new Error('No project data received');
 
-      setProjectId(data.id);
+      setProjectId(data.project.id);
       setSaveStatus('saved');
-      setTimeout(() => navigate(`/edit/${data.id}`), 1000);
+      setTimeout(() => navigate(`/edit/${data.project.id}`), 1000);
     } catch (error) {
       console.error('Save error:', error);
       setSaveStatus('idle');
     }
-  }, [code, userId, navigate, templateName]);
+  }, [code, navigate, templateName]);
 
   const handleSaveToZip = useCallback(() => {
     const zip = new JSZip();
@@ -381,39 +322,26 @@ const DevArea = () => {
 
     try {
       const client = new GitHubClient(config.token, config.repo);
-
-      // Проверяем существование репозитория
       const exists = await client.checkRepoExists();
 
       if (!exists) {
-        // Создаем новый репозиторий
         const repoName = config.repo.split('/')[1];
         await client.createRepo(repoName, config.isPrivate);
       }
 
-      // Загружаем файлы
       await client.uploadProject(code, `Обновление: ${templateName}`);
-
-      // Получаем URL репозитория
       const repoUrl = await client.getRepoUrl();
-
-      // Сохраняем настройки
-      localStorage.setItem(`github_token_${userId}`, config.token);
-      localStorage.setItem(`github_repo_${userId}`, config.repo);
 
       setGithubToken(config.token);
       setGithubRepo(config.repo);
       setGithubStatus('success');
 
-      // Показываем ссылку на репозиторий
       window.open(repoUrl, '_blank');
-
       setTimeout(() => setGithubStatus('idle'), 3000);
     } catch (error) {
       console.error('GitHub save error:', error);
       setGithubError(error instanceof Error ? error.message : 'Ошибка при сохранении на GitHub');
       setGithubStatus('error');
-
       setTimeout(() => setGithubStatus('idle'), 5000);
     }
   };
@@ -494,10 +422,9 @@ const DevArea = () => {
           }}>
             <div style={{
               ...getViewportStyle(),
-              overflow: 'auto', // Прокрутка сохраняется
-              scrollbarWidth: 'none', // Скрываем полосу в Firefox
-              msOverflowStyle: 'none', // Скрываем полосу в IE/Edge
-              // Скрываем полосу в Chrome/Safari через псевдоэлемент
+              overflow: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
             }}>
               <style>{`
                 div[style*="overflow: auto"]::-webkit-scrollbar {
@@ -517,7 +444,7 @@ const DevArea = () => {
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
                   boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
                   backgroundColor: 'white',
-                  overflow: 'hidden' // Запрещаем прокрутку в iframe
+                  overflow: 'hidden'
                 }}
               />
             </div>
@@ -543,11 +470,15 @@ const DevArea = () => {
                 onClick={handleSaveToCloud}
                 disabled={saveStatus === 'saving'}
               >
-                {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект в облако редактора кода'}
+                {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект в облако'}
               </button>
               <button className="save-btn zip" onClick={handleSaveToZip}>
                 Сохранить в ZIP
               </button>
+              <ImageUploader
+                onImageUploaded={handleImageUploaded}
+                onInsertImage={handleInsertImage}
+              />
             </div>
           </div>
 

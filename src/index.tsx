@@ -9,7 +9,7 @@ import RegistrationSystem from './panel/RegistrationSystem';
 import Main from './panel/Main';
 import DevArea from './panel/DevArea';
 import EditProgect from './panel/EditProgect';
-import AuthCallback from './panel/AuthCallback'; // Импортируем новый компонент
+import AuthCallback from './panel/AuthCallback';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -24,7 +24,7 @@ root.render(
         <Route path='/main' element={<Main />} />
         <Route path='/dev' element={<DevArea />} />
         <Route path='/edit/:id' element={<EditProgect />} />
-        <Route path='/auth/callback' element={<AuthCallback />} /> {/* Новый маршрут */}
+        <Route path='/auth/callback' element={<AuthCallback />} />
       </Routes>
     </Router>
   </React.StrictMode>

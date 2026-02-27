@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../database/supabaseClient';
 import Logo from '../components/logo/Logo';
 import ExampleCards from '../components/exampleCards/ExampleCards';
 import '../style/MainPage/Main.css';
 import UserProgects from '../components/userProgects/UserProgects';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
+import { api } from '../services/api';
 
 interface Template {
   id: number;
@@ -25,14 +25,26 @@ function Main() {
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const token = api.getToken();
+        console.log('Main - токен:', token ? 'есть' : 'нет');
 
-        if (!user) {
+        if (!token) {
+          console.log('Нет токена, перенаправление на login');
           navigate('/login');
           return;
         }
 
-        // Загружаем шаблоны из папок template1-4
+        const { data: userData, error: userError } = await api.getCurrentUser();
+        console.log('Main - userData:', userData);
+        console.log('Main - userError:', userError);
+
+        if (userError || !userData?.user) {
+          console.log('Ошибка получения пользователя, очищаем токен');
+          api.clearToken();
+          navigate('/login');
+          return;
+        }
+
         const templateFolders = ['template1', 'template2', 'template3', 'template4'];
         const loadedTemplates = await Promise.all(
           templateFolders.map(async (folder, index) => {
@@ -41,7 +53,6 @@ function Main() {
               const cssResponse = await fetch(`/template/${folder}/style.css`);
               const jsResponse = await fetch(`/template/${folder}/index.js`);
 
-              // Проверяем успешность загрузки
               if (!htmlResponse.ok || !cssResponse.ok || !jsResponse.ok) {
                 console.warn(`Template ${folder} files not found`);
                 return null;
@@ -51,7 +62,6 @@ function Main() {
               const css = await cssResponse.text();
               const js = await jsResponse.text();
 
-              // Извлекаем название из HTML или используем имя папки
               const titleMatch = html.match(/<title>(.*?)<\/title>/i);
               const name = titleMatch ? titleMatch[1] : `Шаблон ${index + 1}`;
 
@@ -70,10 +80,8 @@ function Main() {
           })
         );
 
-        // Фильтруем успешно загруженные шаблоны
         const validTemplates = loadedTemplates.filter(t => t !== null) as Template[];
         setTemplates(validTemplates);
-
       } catch (err) {
         console.error('Error loading templates:', err);
       } finally {
@@ -84,7 +92,6 @@ function Main() {
     fetchTemplates();
   }, [navigate]);
 
-  // Фильтрация шаблонов по поиску
   const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -119,9 +126,7 @@ function Main() {
         <div className="templates-section">
           <div className="templates-header">
             <h2>Готовые шаблоны</h2>
-
             <div className="templates-controls">
-              {/* Поиск */}
               <div className="search-container">
                 <input
                   type="text"
@@ -134,7 +139,6 @@ function Main() {
             </div>
           </div>
 
-          {/* Сетка шаблонов */}
           <div className="templates-grid">
             {filteredTemplates.length > 0 ? (
               filteredTemplates.map(template => (
