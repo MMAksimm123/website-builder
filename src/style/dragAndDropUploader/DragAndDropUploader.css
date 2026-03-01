@@ -1,0 +1,352 @@
+.drag-drop-uploader {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: #f8f9fa;
+  margin-bottom: 20px;
+}
+
+.drop-zone:hover {
+  border-color: #b9ff66;
+  background-color: #f0f0f0;
+}
+
+.drop-zone.dragging {
+  border-color: #b9ff66;
+  background-color: rgba(185, 255, 102, 0.1);
+  transform: scale(1.02);
+}
+
+.drop-zone.uploading {
+  cursor: wait;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-icon {
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.drop-zone-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+.drop-zone-hint {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+}
+
+/* Кнопки загрузки файлов */
+.file-upload-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.upload-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.upload-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.html-btn {
+  background-color: #e44d26;
+}
+
+.html-btn:hover:not(:disabled) {
+  background-color: #d43f1a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(228, 77, 38, 0.3);
+}
+
+.css-btn {
+  background-color: #264de4;
+}
+
+.css-btn:hover:not(:disabled) {
+  background-color: #1f3eb0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(38, 77, 228, 0.3);
+}
+
+.js-btn {
+  background-color: #f7df1e;
+  color: #333;
+}
+
+.js-btn:hover:not(:disabled) {
+  background-color: #e5ce1a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(247, 223, 30, 0.3);
+}
+
+.upload-btn.loaded {
+  background-color: #4CAF50;
+  color: white;
+}
+
+/* Список загруженных файлов */
+.loaded-files {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+}
+
+.loaded-files h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.files-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.file-item:last-child {
+  margin-bottom: 0;
+}
+
+.file-icon {
+  margin-right: 10px;
+  font-size: 16px;
+}
+
+.file-name {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+}
+
+.remove-file-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 5px;
+  transition: color 0.3s ease;
+}
+
+.remove-file-btn:hover {
+  color: #f44336;
+}
+
+/* Название проекта */
+.project-name-section {
+  margin-bottom: 20px;
+}
+
+.project-name-section label {
+  display: block;
+  margin-bottom: 5px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.project-name-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.project-name-input:focus {
+  outline: none;
+  border-color: #b9ff66;
+  box-shadow: 0 0 0 2px rgba(185, 255, 102, 0.2);
+}
+
+/* Кнопки действий */
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.reset-btn,
+.create-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reset-btn {
+  background-color: #e0e0e0;
+  color: #666;
+}
+
+.reset-btn:hover:not(:disabled) {
+  background-color: #d0d0d0;
+}
+
+.reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.create-btn {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.create-btn:hover:not(:disabled) {
+  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+.create-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Ошибки */
+.error-message {
+  margin-top: 15px;
+  padding: 12px;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #ffcdd2;
+}
+
+/* Добавить в конец файла */
+
+/* Указатель мыши для зоны загрузки */
+.drop-zone {
+  cursor: pointer;
+}
+
+.drop-zone.uploading {
+  cursor: wait;
+}
+
+/* Улучшенная типографика */
+.drop-zone-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+.drop-zone-hint {
+  font-size: 14px;
+  color: #999;
+  margin: 5px 0 0 0;
+}
+
+.drop-zone-hint:last-child {
+  margin-bottom: 0;
+}
+
+/* Анимация для иконки */
+.drop-zone:hover .upload-icon {
+  transform: scale(1.05);
+  transition: transform 0.3s ease;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .drag-drop-uploader {
+    padding: 15px;
+  }
+
+  .drop-zone {
+    padding: 25px 20px;
+  }
+
+  .drop-zone-title {
+    font-size: 15px;
+  }
+
+  .drop-zone-hint {
+    font-size: 13px;
+  }
+
+  .file-upload-buttons {
+    flex-direction: column;
+  }
+
+  .upload-btn {
+    width: 100%;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .reset-btn,
+  .create-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .drop-zone {
+    padding: 20px 15px;
+  }
+
+  .upload-icon {
+    width: 40px;
+    height: 40px;
+  }
+}

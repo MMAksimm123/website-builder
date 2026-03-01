@@ -100,6 +100,124 @@
   margin-bottom: 20px;
 }
 
+/* Кнопка загрузки проекта */
+.upload-project-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-right: 10px;
+}
+
+.upload-project-btn:hover {
+  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+.upload-project-btn .upload-icon {
+  margin-right: 4px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Модальное окно загрузки */
+.upload-modal {
+  max-width: 700px !important;
+  width: 90%;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.modal-close-btn:hover {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .upload-project-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .modal-header {
+    padding: 15px 20px;
+  }
+
+  .modal-header h3 {
+    font-size: 18px;
+  }
+
+  .modal-body {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions {
+    gap: 5px;
+  }
+
+  .upload-project-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .upload-project-btn .upload-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
