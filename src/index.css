@@ -11,3 +11,52 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.monaco-editor .suggest-widget,
+.monaco-editor .suggest-widget * {
+  color: #333333 !important;
+  background-color: #ffffff !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+  background-color: #b9ff66 !important;
+  color: #000000 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+  color: #000000 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .highlight {
+  color: #007acc !important;
+  font-weight: bold !important;
+}
+
+/* Подсветка синтаксиса */
+.monaco-editor .token.keyword {
+  color: #0000FF !important;
+}
+
+.monaco-editor .token.string {
+  color: #A31515 !important;
+}
+
+.monaco-editor .token.comment {
+  color: #008000 !important;
+}
+
+.monaco-editor .token.number {
+  color: #098658 !important;
+}
+
+.monaco-editor .token.operator {
+  color: #000000 !important;
+}
+
+.monaco-editor .token.function {
+  color: #795E26 !important;
+}
+
+.monaco-editor .token.variable {
+  color: #001080 !important;
+}

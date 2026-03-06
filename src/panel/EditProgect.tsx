@@ -166,10 +166,82 @@ const EditProject = () => {
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   let saveTimer: NodeJS.Timeout;
+
+  // Функция для получения правильного языка для Monaco
+  const getMonacoLanguage = (tab: string): string => {
+    switch(tab) {
+      case 'html': return 'html';
+      case 'css': return 'css';
+      case 'js': return 'javascript';
+      default: return 'plaintext';
+    }
+  };
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
+
+    // Принудительно устанавливаем язык
+    const model = editor.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+    }
+
+    // Настройка подсветки JavaScript
+    if (monaco.languages?.typescript?.javascriptDefaults) {
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+      });
+    }
+  };
+
+  // Обновляем язык при смене вкладки
+  useEffect(() => {
+    if (editorRef.current) {
+      const monaco = (window as any).monaco;
+      if (monaco) {
+        const model = editorRef.current.getModel();
+        if (model) {
+          monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+        }
+      }
+    }
+  }, [activeTab]);
+
+  // Добавляем глобальные стили для подсказок
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .monaco-editor .suggest-widget,
+      .monaco-editor .suggest-widget * {
+        color: #333333 !important;
+        background-color: #ffffff !important;
+      }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+        background-color: #b9ff66 !important;
+        color: #000000 !important;
+      }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+        color: #000000 !important;
+      }
+      .monaco-editor .token.keyword { color: #0000FF !important; }
+      .monaco-editor .token.string { color: #A31515 !important; }
+      .monaco-editor .token.comment { color: #008000 !important; }
+      .monaco-editor .token.number { color: #098658 !important; }
+      .monaco-editor .token.operator { color: #000000 !important; }
+      .monaco-editor .token.function { color: #795E26 !important; }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const updateIframeContent = useCallback(() => {
     const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
@@ -244,10 +316,10 @@ const EditProject = () => {
     }
   }, [id]);
 
-  const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
+  const handleEditorChange = (value: string | undefined) => {
     if (value === undefined) return;
 
-    const newCode = { ...code, [language]: value };
+    const newCode = { ...code, [activeTab]: value };
     setCode(newCode);
 
     if (AUTO_SAVE_ENABLED && id) {
@@ -482,15 +554,24 @@ const EditProject = () => {
         <div className="editor-section">
           <div className="editor-header">
             <div className="editor-tabs">
-              {(['html', 'css', 'js'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab.toUpperCase()}
-                </button>
-              ))}
+              <button
+                className={`tab-btn ${activeTab === 'html' ? 'active' : ''}`}
+                onClick={() => setActiveTab('html')}
+              >
+                HTML
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'css' ? 'active' : ''}`}
+                onClick={() => setActiveTab('css')}
+              >
+                CSS
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'js' ? 'active' : ''}`}
+                onClick={() => setActiveTab('js')}
+              >
+                JS
+              </button>
             </div>
             <div className="save-buttons">
               <div className={`save-status ${saveStatus}`}>
@@ -515,19 +596,30 @@ const EditProject = () => {
 
           <div className="editor-content">
             <Editor
+              key={editorKey}
               height="100%"
               width="100%"
-              language={activeTab}
+              language={getMonacoLanguage(activeTab)}
               value={code[activeTab]}
-              onChange={(value) => handleEditorChange(value, activeTab)}
-              onMount={(editor) => {
-                editorRef.current = editor;
-              }}
+              onChange={handleEditorChange}
+              onMount={handleEditorDidMount}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 scrollBeyondLastLine: false,
-                automaticLayout: true
+                automaticLayout: true,
+                wordBasedSuggestions: 'off',
+                suggestOnTriggerCharacters: true,
+                quickSuggestions: {
+                  other: 'on',
+                  comments: 'on',
+                  strings: 'on'
+                },
+                parameterHints: {
+                  enabled: true
+                },
+                formatOnPaste: true,
+                formatOnType: true,
               }}
             />
           </div>

@@ -74,7 +74,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             if (window.location.hash !== hash) {
               history.replaceState(null, '', hash);
             }
-            console.log('Anchor navigation:', hash);
             return false;
           }
         });
@@ -95,7 +94,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             originalReplaceState.call(this, state, title, url);
             return;
           }
-          console.log('Navigation prevented in preview mode');
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
         history.replaceState = function(state, title, url) {
@@ -104,10 +102,8 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             originalReplaceState.call(this, state, title, url);
             return;
           }
-          console.log('Navigation prevented in preview mode');
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
-        console.log('Anchor links isolation enabled for preview iframe');
       })();
     </script>
   `;
@@ -168,13 +164,81 @@ const DevArea = () => {
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const handleEditorDidMount = (editor: any) => {
-    editorRef.current = editor;
+  // Функция для получения правильного языка для Monaco
+  const getMonacoLanguage = (tab: string): string => {
+    switch(tab) {
+      case 'html': return 'html';
+      case 'css': return 'css';
+      case 'js': return 'javascript';
+      default: return 'plaintext';
+    }
   };
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
+
+    // Принудительно устанавливаем язык
+    const model = editor.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+    }
+
+    // Настройка подсветки JavaScript
+    if (monaco.languages?.typescript?.javascriptDefaults) {
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+      });
+    }
+  };
+
+  // Обновляем язык при смене вкладки
+  useEffect(() => {
+    if (editorRef.current) {
+      const monaco = (window as any).monaco;
+      if (monaco) {
+        const model = editorRef.current.getModel();
+        if (model) {
+          monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+        }
+      }
+    }
+  }, [activeTab]);
+
+  // Добавляем глобальные стили для подсказок
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .monaco-editor .suggest-widget,
+      .monaco-editor .suggest-widget * {
+        color: #333333 !important;
+        background-color: #ffffff !important;
+      }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+        background-color: #b9ff66 !important;
+        color: #000000 !important;
+      }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+        color: #000000 !important;
+      }
+      .monaco-editor .token.keyword { color: #0000FF !important; }
+      .monaco-editor .token.string { color: #A31515 !important; }
+      .monaco-editor .token.comment { color: #008000 !important; }
+      .monaco-editor .token.number { color: #098658 !important; }
+      .monaco-editor .token.operator { color: #000000 !important; }
+      .monaco-editor .token.function { color: #795E26 !important; }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const insertTextAtCursor = (text: string) => {
     if (!editorRef.current) return;
@@ -194,7 +258,7 @@ const DevArea = () => {
     }]);
   };
 
-  const handleImageUploaded = (image: { id: string; url: string; name: string }) => {
+  const handleImageUploaded = (image: any) => {
     console.log('Image uploaded:', image);
   };
 
@@ -298,9 +362,9 @@ const DevArea = () => {
     });
   }, [code, templateName]);
 
-  const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
+  const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
-      setCode(prev => ({ ...prev, [language]: value }));
+      setCode(prev => ({ ...prev, [activeTab]: value }));
     }
   };
 
@@ -454,15 +518,24 @@ const DevArea = () => {
         <div className="editor-section">
           <div className="editor-header">
             <div className="editor-tabs">
-              {(['html', 'css', 'js'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab.toUpperCase()}
-                </button>
-              ))}
+              <button
+                className={`tab-btn ${activeTab === 'html' ? 'active' : ''}`}
+                onClick={() => setActiveTab('html')}
+              >
+                HTML
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'css' ? 'active' : ''}`}
+                onClick={() => setActiveTab('css')}
+              >
+                CSS
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'js' ? 'active' : ''}`}
+                onClick={() => setActiveTab('js')}
+              >
+                JS
+              </button>
             </div>
             <div className="save-buttons">
               <button
@@ -476,6 +549,7 @@ const DevArea = () => {
                 Сохранить в ZIP
               </button>
               <ImageUploader
+                projectId={projectId || undefined}
                 onImageUploaded={handleImageUploaded}
                 onInsertImage={handleInsertImage}
               />
@@ -484,17 +558,30 @@ const DevArea = () => {
 
           <div className="editor-content">
             <Editor
+              key={editorKey}
               height="100%"
               width="100%"
-              language={activeTab}
+              language={getMonacoLanguage(activeTab)}
               value={code[activeTab]}
-              onChange={(value) => handleEditorChange(value, activeTab)}
+              onChange={handleEditorChange}
               onMount={handleEditorDidMount}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 scrollBeyondLastLine: false,
-                automaticLayout: true
+                automaticLayout: true,
+                wordBasedSuggestions: 'off',
+                suggestOnTriggerCharacters: true,
+                quickSuggestions: {
+                  other: 'on',
+                  comments: 'on',
+                  strings: 'on'
+                },
+                parameterHints: {
+                  enabled: true
+                },
+                formatOnPaste: true,
+                formatOnType: true,
               }}
             />
           </div>
