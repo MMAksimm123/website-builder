@@ -39,12 +39,20 @@ test('renders learn react link', () => {
 
 
 /src/App.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import './App.css';
 import CustomHeader from './components/customHeader/customHeader';
 import PresentBlock from './components/PresentBlock/PresentBlock';
+import { api } from './services/api';
 
 function App() {
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      api.setToken(token);
+    }
+  }, []);
+
   return (
     <div className="App">
       <div className='head'>
@@ -91,6 +99,370 @@ const CustomHeader = ({ createSitePath = "login" }: CustomHeaderProps) => {
 }
 
 export default CustomHeader;
+
+
+/src/components/dragAndDropUploader/DragAndDropUploader.tsx
+import React, { useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../../services/api';
+import '../../style/dragAndDropUploader/DragAndDropUploader.css';
+
+interface UploadedFile {
+  name: string;
+  content: string;
+  type: 'html' | 'css' | 'js';
+}
+
+interface ProjectFiles {
+  html?: UploadedFile;
+  css?: UploadedFile;
+  js?: UploadedFile;
+}
+
+const DragAndDropUploader: React.FC = () => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [projectFiles, setProjectFiles] = useState<ProjectFiles>({});
+  const [projectName, setProjectName] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+
+  const getFileType = (filename: string): 'html' | 'css' | 'js' | null => {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    if (extension === 'html' || extension === 'htm') return 'html';
+    if (extension === 'css') return 'css';
+    if (extension === 'js') return 'js';
+    return null;
+  };
+
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = () => reject(new Error(`Ошибка чтения файла ${file.name}`));
+      reader.readAsText(file);
+    });
+  };
+
+  const extractProjectName = (htmlContent: string): string => {
+    const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
+    return titleMatch && titleMatch[1] ? titleMatch[1].trim() : '';
+  };
+
+  const processFiles = async (fileList: FileList) => {
+    const files = Array.from(fileList);
+
+    for (const file of files) {
+      const fileType = getFileType(file.name);
+      if (fileType) {
+        try {
+          setIsUploading(true);
+          const content = await readFileContent(file);
+
+          setProjectFiles(prev => {
+            const newFiles = { ...prev };
+            newFiles[fileType] = {
+              name: file.name,
+              content,
+              type: fileType
+            };
+            return newFiles;
+          });
+
+          // Если загружен HTML, пытаемся извлечь название
+          if (fileType === 'html') {
+            const name = extractProjectName(content);
+            if (name) setProjectName(name);
+          }
+
+          setError('');
+        } catch (err) {
+          setError(`Ошибка загрузки файла ${file.name}`);
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    }
+  };
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      await processFiles(files);
+    }
+    // Сбрасываем input, чтобы можно было выбрать те же файлы снова
+    e.target.value = '';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await processFiles(files);
+    }
+  }, []);
+
+  const handleDropZoneClick = () => {
+    // Программно открываем диалог выбора файлов
+    fileInputRef.current?.click();
+  };
+
+  const triggerFileInput = (type: 'html' | 'css' | 'js') => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = type === 'html' ? '.html,.htm' : `.${type}`;
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        setIsUploading(true);
+        try {
+          const content = await readFileContent(file);
+
+          setProjectFiles(prev => {
+            const newFiles = { ...prev };
+            newFiles[type] = {
+              name: file.name,
+              content,
+              type
+            };
+            return newFiles;
+          });
+
+          if (type === 'html') {
+            const name = extractProjectName(content);
+            if (name) setProjectName(name);
+          }
+
+          setError('');
+        } catch (err) {
+          setError(`Ошибка загрузки файла ${file.name}`);
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    };
+    input.click();
+  };
+
+  const removeFile = (type: 'html' | 'css' | 'js') => {
+    setProjectFiles(prev => {
+      const newFiles = { ...prev };
+      delete newFiles[type];
+      return newFiles;
+    });
+
+    // Если удаляем HTML, очищаем название проекта
+    if (type === 'html') {
+      setProjectName('');
+    }
+  };
+
+  const handleCreateProject = async () => {
+    if (!projectFiles.html) {
+      setError('Необходимо загрузить HTML файл');
+      return;
+    }
+
+    setIsUploading(true);
+    setError('');
+
+    try {
+      const { data, error: createError } = await api.createProject(
+        projectName || 'Новый проект',
+        projectFiles.html.content,
+        projectFiles.css?.content || '',
+        projectFiles.js?.content || ''
+      );
+
+      if (createError) throw new Error(createError);
+      if (!data?.project) throw new Error('Не удалось создать проект');
+
+      // Перенаправляем на страницу редактирования
+      navigate(`/edit/${data.project.id}`);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка при создании проекта');
+      setIsUploading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setProjectFiles({});
+    setProjectName('');
+    setError('');
+  };
+
+  return (
+    <div className="drag-drop-uploader">
+      {/* Скрытый input для выбора файлов */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".html,.htm,.css,.js"
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+      />
+
+      {/* Зона drag-and-drop с возможностью клика */}
+      <div
+        className={`drop-zone ${isDragging ? 'dragging' : ''} ${isUploading ? 'uploading' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={handleDropZoneClick}
+      >
+        <div className="drop-zone-content">
+          <svg className="upload-icon" viewBox="0 0 24 24" width="48" height="48">
+            <path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+          </svg>
+          <p className="drop-zone-title">
+            Перетащите файлы сюда или нажмите для выбора
+          </p>
+          <p className="drop-zone-hint">
+            Поддерживаются файлы: .html, .css, .js
+          </p>
+          <p className="drop-zone-hint">
+            Можно выбрать несколько файлов одновременно
+          </p>
+        </div>
+      </div>
+
+      {/* Кнопки для загрузки отдельных файлов */}
+      <div className="file-upload-buttons">
+        <button
+          className={`upload-btn html-btn ${projectFiles.html ? 'loaded' : ''}`}
+          onClick={() => triggerFileInput('html')}
+          disabled={isUploading}
+        >
+          {projectFiles.html ? '✓ HTML загружен' : 'Загрузить HTML'}
+        </button>
+        <button
+          className={`upload-btn css-btn ${projectFiles.css ? 'loaded' : ''}`}
+          onClick={() => triggerFileInput('css')}
+          disabled={isUploading}
+        >
+          {projectFiles.css ? '✓ CSS загружен' : 'Загрузить CSS'}
+        </button>
+        <button
+          className={`upload-btn js-btn ${projectFiles.js ? 'loaded' : ''}`}
+          onClick={() => triggerFileInput('js')}
+          disabled={isUploading}
+        >
+          {projectFiles.js ? '✓ JS загружен' : 'Загрузить JS'}
+        </button>
+      </div>
+
+      {/* Список загруженных файлов */}
+      {Object.keys(projectFiles).length > 0 && (
+        <div className="loaded-files">
+          <h4>Загруженные файлы:</h4>
+          <ul className="files-list">
+            {projectFiles.html && (
+              <li className="file-item">
+                <span className="file-icon">📄</span>
+                <span className="file-name">{projectFiles.html.name}</span>
+                <button
+                  className="remove-file-btn"
+                  onClick={() => removeFile('html')}
+                  disabled={isUploading}
+                >
+                  ✕
+                </button>
+              </li>
+            )}
+            {projectFiles.css && (
+              <li className="file-item">
+                <span className="file-icon">🎨</span>
+                <span className="file-name">{projectFiles.css.name}</span>
+                <button
+                  className="remove-file-btn"
+                  onClick={() => removeFile('css')}
+                  disabled={isUploading}
+                >
+                  ✕
+                </button>
+              </li>
+            )}
+            {projectFiles.js && (
+              <li className="file-item">
+                <span className="file-icon">⚡</span>
+                <span className="file-name">{projectFiles.js.name}</span>
+                <button
+                  className="remove-file-btn"
+                  onClick={() => removeFile('js')}
+                  disabled={isUploading}
+                >
+                  ✕
+                </button>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* Название проекта */}
+      {projectFiles.html && (
+        <div className="project-name-section">
+          <label htmlFor="project-name">Название проекта:</label>
+          <input
+            type="text"
+            id="project-name"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            placeholder="Введите название проекта"
+            className="project-name-input"
+            disabled={isUploading}
+          />
+        </div>
+      )}
+
+      {/* Кнопки действий */}
+      <div className="action-buttons">
+        <button
+          className="reset-btn"
+          onClick={handleReset}
+          disabled={isUploading || Object.keys(projectFiles).length === 0}
+        >
+          Очистить всё
+        </button>
+        <button
+          className="create-btn"
+          onClick={handleCreateProject}
+          disabled={!projectFiles.html || isUploading}
+        >
+          {isUploading ? 'Создание...' : 'Создать проект'}
+        </button>
+      </div>
+
+      {/* Ошибки */}
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DragAndDropUploader;
 
 
 /src/components/exampleCards/ExampleCards.tsx
@@ -392,7 +764,7 @@ import { UploadedImage, uploadImage } from '../../utils/uploadImage';
 import '../../style/ImageUploader/ImageUploader.css'
 
 interface ImageUploaderProps {
-  projectId?: string;
+  projectId?: string | number;
   onImageUploaded?: (image: UploadedImage) => void;
   onInsertImage?: (url: string) => void;
 }
@@ -416,7 +788,9 @@ const ImageUploader = ({ projectId, onImageUploaded, onInsertImage }: ImageUploa
 
     setIsUploading(true);
     try {
-      const uploadedImage = await uploadImage(file, projectId);
+      const projectIdStr = projectId ? projectId.toString() : undefined;
+      const uploadedImage = await uploadImage(file, projectIdStr);
+
       setImageUrl(uploadedImage.url);
       setShowModal(true);
 
@@ -475,14 +849,14 @@ const ImageUploader = ({ projectId, onImageUploaded, onInsertImage }: ImageUploa
               </button>
             </div>
             <div className="modal-actions">
-              {/* {onInsertImage && (
+              {onInsertImage && (
                 <button
                   onClick={handleInsert}
                   className="insert-button"
                 >
                   Вставить в редактор
                 </button>
-              )} */}
+              )}
               <button
                 onClick={() => setShowModal(false)}
                 className="close-button"
@@ -503,10 +877,9 @@ export default ImageUploader;
 /src/components/Logining/Logining.tsx
 import { useState, FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../database/supabaseClient';
 import '../../style/Logining/Logining.css';
 import { handleNavigate } from '../../functions/Navigate/Navigate';
-import { signInWithGitHub } from '../../database/socialAuth';
+import { api } from '../../services/api';
 
 interface CustomLoginingProps {
   createPath?: string;
@@ -516,6 +889,8 @@ interface LocationState {
   email?: string;
   registrationSuccess?: boolean;
 }
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
   const navigate = useNavigate();
@@ -532,15 +907,15 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
     setError('');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      const { data, error } = await api.login(email, password);
 
-      if (error) throw error;
+      if (error) throw new Error(error);
+
+      if (data?.token) {
+        api.setToken(data.token);
+      }
 
       navigate('/main');
-
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Ошибка при входе');
     } finally {
@@ -548,16 +923,14 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
     }
   };
 
-  const handleGitHubLogin = async () => {
+  const handleGitHubLogin = () => {
     setGithubLoading(true);
     setError('');
 
     try {
-      const { error } = await signInWithGitHub();
-      if (error) throw error;
-      // Перенаправление произойдет автоматически через OAuth
+      window.location.href = `${API_URL}/api/auth/github`;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Ошибка при входе через GitHub');
+      setError('Ошибка при входе через GitHub');
       setGithubLoading(false);
     }
   };
@@ -662,16 +1035,15 @@ export default Logo;
 
 /src/components/LogoutButton/LogoutButton.tsx
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../database/supabaseClient';
 import '../../style/LogoutButton/LogoutButton.css';
+import { api } from '../../services/api';
 
 const LogoutButton = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      api.logout();
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
@@ -715,14 +1087,15 @@ import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleNavigate } from '../../functions/Navigate/Navigate';
 import '../../style/Logining/Logining.css';
-import { supabase } from '../../database/supabaseClient';
-import { signInWithGitHub } from '../../database/socialAuth';
+import { api } from '../../services/api';
 
 interface CustomLoginingProps {
   createPath?: string;
 }
 
-const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -759,18 +1132,9 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
     }
 
     try {
-      const { error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: '',
-            avatar_url: ''
-          }
-        }
-      });
+      const { data, error } = await api.register(formData.email, formData.password);
 
-      if (authError) throw authError;
+      if (error) throw new Error(error);
 
       navigate(createPath, {
         state: {
@@ -778,30 +1142,21 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
           email: formData.email
         }
       });
-
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message.includes('User already registered')
-          ? 'Пользователь с таким email уже зарегистрирован'
-          : error.message);
-      } else {
-        setError('Произошла неизвестная ошибка при регистрации');
-      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Ошибка при регистрации');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGitHubSignUp = async () => {
+  const handleGitHubSignUp = () => {
     setGithubLoading(true);
     setError('');
 
     try {
-      const { error } = await signInWithGitHub();
-      if (error) throw error;
-      // Перенаправление произойдет автоматически
+      window.location.href = `${API_URL}/api/auth/github`;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Ошибка при регистрации через GitHub');
+      setError('Ошибка при регистрации через GitHub');
       setGithubLoading(false);
     }
   };
@@ -849,7 +1204,6 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
             className="buttonLog"
             type="submit"
             disabled={loading || !formData.email || !formData.password || !formData.confirmPassword}
-            aria-busy={loading}
           >
             {loading ? 'Регистрация...' : 'Зарегистрироваться'}
           </button>
@@ -895,8 +1249,8 @@ export default Registration;
 /src/components/userProgects/UserProgects.tsx
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../database/supabaseClient';
 import '../../style/UserProgects/UserProjects.css';
+import { api } from '../../services/api';
 
 interface UserProject {
   id: number;
@@ -904,7 +1258,7 @@ interface UserProject {
   updated_at: string;
 }
 
-const CACHE_TTL = 0.25 * 60 * 1000; // 15 секунд
+const CACHE_TTL = 0.25 * 60 * 1000;
 const getCacheKey = (userId: string) => `user_projects_${userId}`;
 
 const UserProgects = () => {
@@ -917,33 +1271,15 @@ const UserProgects = () => {
   const [projectToDelete, setProjectToDelete] = useState<UserProject | null>(null);
   const navigate = useNavigate();
 
-  const fetchProjects = useCallback(async (userId: string) => {
-    // Проверка кэша
-    const cacheKey = getCacheKey(userId);
-    const cachedData = localStorage.getItem(cacheKey);
-    const cacheTime = localStorage.getItem(`${cacheKey}_time`);
-
-    if (cachedData && cacheTime && Date.now() - parseInt(cacheTime) < CACHE_TTL) {
-      return JSON.parse(cachedData) as UserProject[];
+  const fetchProjects = useCallback(async () => {
+    const token = api.getToken();
+    if (!token) {
+      throw new Error('No token');
     }
 
-    // Запрос к базе данных
-    const { data, error } = await supabase
-      .from('user_projects')
-      .select('id, name, updated_at')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
-      .range(0, 9);
-
-    if (error) throw error;
-
-    const projectsData = data || [];
-
-    // Сохранение в кэш
-    localStorage.setItem(cacheKey, JSON.stringify(projectsData));
-    localStorage.setItem(`${cacheKey}_time`, Date.now().toString());
-
-    return projectsData;
+    const { data, error } = await api.getProjects();
+    if (error) throw new Error(error);
+    return data?.projects || [];
   }, []);
 
   useEffect(() => {
@@ -955,18 +1291,20 @@ const UserProgects = () => {
         setInitialLoading(true);
         setError(null);
 
-        // Получение текущего пользователя
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError) throw authError;
-
-        if (!user) {
+        const token = api.getToken();
+        if (!token) {
           navigate('/login');
           return;
         }
 
-        // Загрузка проектов
-        const projectsData = await fetchProjects(user.id);
+        const { data: userData, error: userError } = await api.getCurrentUser();
+        if (userError || !userData?.user) {
+          api.clearToken();
+          navigate('/login');
+          return;
+        }
+
+        const projectsData = await fetchProjects();
 
         if (isMounted) {
           setProjects(projectsData);
@@ -979,7 +1317,6 @@ const UserProgects = () => {
       } finally {
         if (isMounted) {
           setLoading(false);
-          // Небольшая задержка для плавного исчезновения лоадера
           setTimeout(() => {
             if (isMounted) {
               setInitialLoading(false);
@@ -1000,20 +1337,17 @@ const UserProgects = () => {
     navigate(`/edit/${projectId}`);
   };
 
-  // Открытие модального окна подтверждения удаления
   const handleDeleteClick = (e: React.MouseEvent, project: UserProject) => {
-    e.stopPropagation(); // Предотвращаем переход на страницу проекта
+    e.stopPropagation();
     setProjectToDelete(project);
     setShowDeleteModal(true);
   };
 
-  // Закрытие модального окна
   const handleCloseModal = () => {
     setShowDeleteModal(false);
     setProjectToDelete(null);
   };
 
-  // Удаление проекта
   const handleConfirmDelete = async () => {
     if (!projectToDelete) return;
 
@@ -1021,25 +1355,10 @@ const UserProgects = () => {
     setShowDeleteModal(false);
 
     try {
-      const { error } = await supabase
-        .from('user_projects')
-        .delete()
-        .eq('id', projectToDelete.id);
+      const { error } = await api.deleteProject(projectToDelete.id.toString());
+      if (error) throw new Error(error);
 
-      if (error) throw error;
-
-      // Обновляем список проектов
       setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
-
-      // Очищаем кэш для текущего пользователя
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const cacheKey = getCacheKey(user.id);
-        localStorage.removeItem(cacheKey);
-        localStorage.removeItem(`${cacheKey}_time`);
-      }
-
-      // Показываем уведомление об успешном удалении
       alert('Проект успешно удален');
     } catch (err) {
       console.error('Ошибка при удалении проекта:', err);
@@ -1053,14 +1372,10 @@ const UserProgects = () => {
   const handleRetry = () => {
     setInitialLoading(true);
     setError(null);
-    // Перезапуск загрузки данных
     const loadData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const projectsData = await fetchProjects(user.id);
-          setProjects(projectsData);
-        }
+        const projectsData = await fetchProjects();
+        setProjects(projectsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Произошла ошибка при загрузке проектов');
       } finally {
@@ -1082,7 +1397,6 @@ const UserProgects = () => {
     });
   }, []);
 
-  // Отображение ошибки
   if (error) {
     return (
       <div className="listContainer">
@@ -1098,7 +1412,6 @@ const UserProgects = () => {
     );
   }
 
-  // Отображение загрузки
   if (initialLoading) {
     return (
       <div className="listContainer">
@@ -1113,7 +1426,6 @@ const UserProgects = () => {
     );
   }
 
-  // Основной рендер
   return (
     <div className="listContainer">
       <h3>Ваши проекты</h3>
@@ -1167,7 +1479,6 @@ const UserProgects = () => {
         )}
       </div>
 
-      {/* Модальное окно подтверждения удаления */}
       {showDeleteModal && projectToDelete && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -1305,6 +1616,55 @@ code {
     monospace;
 }
 
+.monaco-editor .suggest-widget,
+.monaco-editor .suggest-widget * {
+  color: #333333 !important;
+  background-color: #ffffff !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+  background-color: #b9ff66 !important;
+  color: #000000 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+  color: #000000 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .highlight {
+  color: #007acc !important;
+  font-weight: bold !important;
+}
+
+/* Подсветка синтаксиса */
+.monaco-editor .token.keyword {
+  color: #0000FF !important;
+}
+
+.monaco-editor .token.string {
+  color: #A31515 !important;
+}
+
+.monaco-editor .token.comment {
+  color: #008000 !important;
+}
+
+.monaco-editor .token.number {
+  color: #098658 !important;
+}
+
+.monaco-editor .token.operator {
+  color: #000000 !important;
+}
+
+.monaco-editor .token.function {
+  color: #795E26 !important;
+}
+
+.monaco-editor .token.variable {
+  color: #001080 !important;
+}
+
 
 /src/index.tsx
 import React from 'react';
@@ -1318,7 +1678,7 @@ import RegistrationSystem from './panel/RegistrationSystem';
 import Main from './panel/Main';
 import DevArea from './panel/DevArea';
 import EditProgect from './panel/EditProgect';
-import AuthCallback from './panel/AuthCallback'; // Импортируем новый компонент
+import AuthCallback from './panel/AuthCallback';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -1333,7 +1693,7 @@ root.render(
         <Route path='/main' element={<Main />} />
         <Route path='/dev' element={<DevArea />} />
         <Route path='/edit/:id' element={<EditProgect />} />
-        <Route path='/auth/callback' element={<AuthCallback />} /> {/* Новый маршрут */}
+        <Route path='/auth/callback' element={<AuthCallback />} />
       </Routes>
     </Router>
   </React.StrictMode>
@@ -1347,35 +1707,46 @@ reportWebVitals();
 
 /src/panel/AuthCallback.tsx
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../database/supabaseClient';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { api } from '../services/api';
 import '../style/AuthCallback/AuthCallback.css';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const params = new URLSearchParams(location.search);
+      const token = params.get('token');
+      const userType = params.get('userType');
+      const error = params.get('error');
+
+      console.log('Auth callback - token:', token ? 'получен' : 'не получен');
+      console.log('Auth callback - userType:', userType);
+      console.log('Auth callback - error:', error);
 
       if (error) {
         console.error('Auth callback error:', error);
-        navigate('/login');
+        navigate('/login?error=auth_failed');
         return;
       }
 
-      if (session) {
-        // Небольшая задержка для плавности
+      if (token) {
+        api.setToken(token);
+        console.log('Токен сохранен, перенаправление на /main');
+
         setTimeout(() => {
           navigate('/main');
         }, 1000);
       } else {
+        console.log('Токен не получен, перенаправление на /login');
         navigate('/login');
       }
     };
 
     handleAuthCallback();
-  }, [navigate]);
+  }, [navigate, location]);
 
   return (
     <div className="auth-callback-container">
@@ -1396,7 +1767,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { supabase } from '../database/supabaseClient';
 import '../style/DevArea/DevArea.css';
 import { loadTemplateFiles } from '../utils/loadTemplate';
 import Logo from '../components/logo/Logo';
@@ -1404,6 +1774,7 @@ import LogoutButton from '../components/LogoutButton/LogoutButton';
 import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
+import { api } from '../services/api';
 
 const DEFAULT_TEMPLATE = {
   html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
@@ -1419,132 +1790,7 @@ const VIEWPORT_SIZES = {
   mobile: { width: '375px', height: '667px', label: 'Мобильный' }
 };
 
-// Функция для создания HTML с изолированной обработкой якорных ссылок и скрытыми полосами прокрутки
 const createIsolatedHTML = (html: string, css: string, js: string) => {
-  // Добавляем стили для скрытия полос прокрутки, но сохранения функционала
-  const hideScrollbarStyles = `
-    <style>
-      /* Скрываем полосы прокрутки для всех браузеров */
-      html {
-        scrollbar-width: none; /* Firefox */
-        -ms-overflow-style: none; /* IE and Edge */
-      }
-
-      html::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
-      }
-
-      body {
-        overflow: auto; /* Сохраняем возможность прокрутки */
-        -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
-      }
-
-      /* Для элементов с прокруткой внутри */
-      * {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-      }
-
-      *::-webkit-scrollbar {
-        display: none;
-      }
-    </style>
-  `;
-
-  // Скрипт для правильной обработки якорных ссылок внутри iframe
-  const anchorHandler = `
-    <script>
-      (function() {
-        // Функция для прокрутки к элементу по якорю
-        function scrollToAnchor(hash) {
-          if (!hash || hash === '#') return;
-
-          // Убираем символ # для поиска элемента
-          const targetId = hash.substring(1);
-          const targetElement = document.getElementById(targetId);
-
-          if (targetElement) {
-            targetElement.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start'
-            });
-          }
-        }
-
-        // Перехватываем клики по ссылкам с якорями
-        document.addEventListener('click', function(e) {
-          const link = e.target.closest('a');
-          if (!link || !link.hash) return;
-
-          // Проверяем, является ли ссылка якорной (начинается с #)
-          if (link.hash.startsWith('#')) {
-            e.preventDefault();
-
-            // Получаем только хеш часть
-            const hash = link.hash;
-
-            // Прокручиваем к элементу
-            scrollToAnchor(hash);
-
-            // Обновляем хеш в URL iframe (без перезагрузки страницы)
-            if (window.location.hash !== hash) {
-              history.replaceState(null, '', hash);
-            }
-
-            console.log('Anchor navigation:', hash);
-            return false;
-          }
-        });
-
-        // Обрабатываем начальный хеш при загрузке
-        if (window.location.hash) {
-          setTimeout(() => {
-            scrollToAnchor(window.location.hash);
-          }, 100);
-        }
-
-        // Перехватываем изменения хеша
-        window.addEventListener('hashchange', function(e) {
-          e.preventDefault();
-          scrollToAnchor(window.location.hash);
-        });
-
-        // Переопределяем pushState для предотвращения изменения родительского URL
-        const originalPushState = history.pushState;
-        const originalReplaceState = history.replaceState;
-
-        history.pushState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
-          if (typeof url === 'string' && url.startsWith('#')) {
-            scrollToAnchor(url);
-            originalReplaceState.call(this, state, title, url);
-            return;
-          }
-
-          // Для обычных URL предотвращаем навигацию
-          console.log('Navigation prevented in preview mode');
-          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
-        };
-
-        history.replaceState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
-          if (typeof url === 'string' && url.startsWith('#')) {
-            scrollToAnchor(url);
-            originalReplaceState.call(this, state, title, url);
-            return;
-          }
-
-          // Для обычных URL предотвращаем навигацию
-          console.log('Navigation prevented in preview mode');
-          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
-        };
-
-        console.log('Anchor links isolation enabled for preview iframe');
-      })();
-    </script>
-  `;
-
-  // Собираем полный HTML с правильной структурой
   return `
 <!DOCTYPE html>
 <html>
@@ -1552,9 +1798,7 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="/">
-    ${hideScrollbarStyles}
     <style>
-      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -1563,28 +1807,162 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
-
-      /* Стили пользователя */
       ${css}
+
+      /* Стили для модального окна alert */
+      .custom-alert {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        z-index: 10000;
+        min-width: 300px;
+        max-width: 500px;
+        font-family: Arial, sans-serif;
+      }
+
+      .custom-alert .message {
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      .custom-alert button {
+        padding: 8px 16px;
+        background: #b9ff66;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        float: right;
+      }
+
+      .custom-alert-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+      }
     </style>
-    ${anchorHandler}
   </head>
   <body>
     ${html}
+
     <script>
-      // Пользовательский JavaScript
-      ${js}
-
-      // Дополнительный код для эмуляции работы якорей
       (function() {
-        // Если есть обработчики на window.onhashchange, сохраняем их
-        const originalOnHashChange = window.onhashchange;
+        // Сохраняем оригинальные методы
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
 
-        window.onhashchange = function(e) {
-          if (originalOnHashChange) {
-            originalOnHashChange.call(this, e);
-          }
+        // Перехватываем добавление обработчиков
+        const handlers = [];
+
+        EventTarget.prototype.addEventListener = function(type, handler, options) {
+          handlers.push({ target: this, type, handler, options });
+          return originalAddEventListener.call(this, type, handler, options);
         };
+
+        // Эмуляция alert если заблокирован
+        if (typeof window.alert !== 'function' || window.alert.toString().includes('sandbox')) {
+          window.alert = function(message) {
+            console.log('[Alert]', message);
+
+            // Создаем overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'custom-alert-overlay';
+
+            // Создаем модальное окно
+            const modal = document.createElement('div');
+            modal.className = 'custom-alert';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.textContent = message;
+
+            const button = document.createElement('button');
+            button.textContent = 'OK';
+            button.onclick = function() {
+              document.body.removeChild(overlay);
+              document.body.removeChild(modal);
+            };
+
+            modal.appendChild(messageDiv);
+            modal.appendChild(button);
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(modal);
+          };
+        }
+
+        // Эмуляция confirm
+        if (typeof window.confirm !== 'function' || window.confirm.toString().includes('sandbox')) {
+          window.confirm = function(message) {
+            console.log('[Confirm]', message);
+            return true; // Всегда возвращаем true для простоты
+          };
+        }
+
+        // Эмуляция prompt
+        if (typeof window.prompt !== 'function' || window.prompt.toString().includes('sandbox')) {
+          window.prompt = function(message, defaultValue) {
+            console.log('[Prompt]', message, defaultValue);
+            return defaultValue || ''; // Возвращаем значение по умолчанию
+          };
+        }
+
+        // Функция для выполнения пользовательского кода
+        function executeUserScript() {
+          try {
+            // Выполняем пользовательский JS
+            eval(${JSON.stringify(js)});
+
+            // Вызываем готовые обработчики если есть
+            if (typeof window.onload === 'function') {
+              window.onload.call(window);
+            }
+
+            if (typeof document.onload === 'function') {
+              document.onload.call(document);
+            }
+
+            console.log('✅ JavaScript выполнен успешно');
+          } catch (error) {
+            console.error('❌ Ошибка JavaScript:', error);
+
+            // Показываем ошибку визуально
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = \`
+              position: fixed;
+              bottom: 20px;
+              right: 20px;
+              background: #ff4444;
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              font-family: monospace;
+              font-size: 14px;
+              z-index: 10000;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              max-width: 400px;
+              word-wrap: break-word;
+            \`;
+            errorDiv.innerHTML = \`<strong>JavaScript Error:</strong> \${error.message}\`;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => errorDiv.remove(), 5000);
+          }
+        }
+
+        // Выполняем после загрузки DOM
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', executeUserScript);
+        } else {
+          executeUserScript();
+        }
       })();
     </script>
   </body>
@@ -1599,7 +1977,6 @@ const DevArea = () => {
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
   const [code, setCode] = useState(DEFAULT_TEMPLATE);
   const [srcDoc, setSrcDoc] = useState('');
-  const [userId, setUserId] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
   const [templateName, setTemplateName] = useState<string>('Новый проект');
@@ -1610,13 +1987,96 @@ const DevArea = () => {
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const handleEditorDidMount = (editor: any) => {
-    editorRef.current = editor;
+  // Функция для получения правильного языка для Monaco
+  const getMonacoLanguage = (tab: string): string => {
+    switch(tab) {
+      case 'html': return 'html';
+      case 'css': return 'css';
+      case 'js': return 'javascript';
+      default: return 'plaintext';
+    }
   };
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
+
+    // Принудительно устанавливаем язык
+    const model = editor.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+    }
+
+    // Настройка подсветки JavaScript
+    if (monaco.languages?.typescript?.javascriptDefaults) {
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+      });
+    }
+  };
+
+  // Обновляем язык при смене вкладки
+  useEffect(() => {
+    if (editorRef.current) {
+      const monaco = (window as any).monaco;
+      if (monaco) {
+        const model = editorRef.current.getModel();
+        if (model) {
+          monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+        }
+      }
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+  const handleIframeMessages = (event: MessageEvent) => {
+    // Получаем сообщения из iframe
+    if (event.data?.type === 'console') {
+      console.log(`[Iframe] ${event.data.level}:`, event.data.args);
+    }
+  };
+
+  window.addEventListener('message', handleIframeMessages);
+
+  return () => {
+    window.removeEventListener('message', handleIframeMessages);
+  };
+}, []);
+
+  // Добавляем глобальные стили для подсказок
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .monaco-editor .suggest-widget,
+      .monaco-editor .suggest-widget * {
+        color: #333333 !important;
+        background-color: #ffffff !important;
+      }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+        background-color: #b9ff66 !important;
+        color: #000000 !important;
+      }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+        color: #000000 !important;
+      }
+      .monaco-editor .token.keyword { color: #0000FF !important; }
+      .monaco-editor .token.string { color: #A31515 !important; }
+      .monaco-editor .token.comment { color: #008000 !important; }
+      .monaco-editor .token.number { color: #098658 !important; }
+      .monaco-editor .token.operator { color: #000000 !important; }
+      .monaco-editor .token.function { color: #795E26 !important; }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const insertTextAtCursor = (text: string) => {
     if (!editorRef.current) return;
@@ -1636,7 +2096,7 @@ const DevArea = () => {
     }]);
   };
 
-  const handleImageUploaded = (image: { id: string; url: string; name: string }) => {
+  const handleImageUploaded = (image: any) => {
     console.log('Image uploaded:', image);
   };
 
@@ -1647,21 +2107,26 @@ const DevArea = () => {
     }
   };
 
-  // Обновление iframe с изолированным контентом
   const updateIframeContent = useCallback(() => {
     const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
     setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now()); // Обновляем ключ для перезагрузки iframe
+    setIframeKey(Date.now());
   }, [code]);
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const token = api.getToken();
+      if (!token) {
         navigate('/login');
         return;
       }
-      setUserId(user.id);
+
+      const { data: userData, error: userError } = await api.getCurrentUser();
+      if (userError || !userData?.user) {
+        api.clearToken();
+        navigate('/login');
+        return;
+      }
 
       const state = location.state as { templateKey?: string; templateId?: number } | null;
 
@@ -1687,21 +2152,11 @@ const DevArea = () => {
           setCode(template);
         }
       }
-
-      // Загружаем GitHub настройки из localStorage
-      const savedGithubToken = localStorage.getItem(`github_token_${user.id}`);
-      const savedGithubRepo = localStorage.getItem(`github_repo_${user.id}`);
-
-      if (savedGithubToken && savedGithubRepo) {
-        setGithubToken(savedGithubToken);
-        setGithubRepo(savedGithubRepo);
-      }
     };
 
     init();
   }, [location.state, navigate]);
 
-  // Обновляем iframe при изменении кода с debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       updateIframeContent();
@@ -1716,29 +2171,24 @@ const DevArea = () => {
 
     setSaveStatus('saving');
     try {
-      const { data, error } = await supabase
-        .from('user_projects')
-        .insert({
-          user_id: userId,
-          name: projectName,
-          html: code.html,
-          css: code.css,
-          js: code.js,
-          updated_at: new Date()
-        })
-        .select()
-        .single();
+      const { data, error } = await api.createProject(
+        projectName,
+        code.html,
+        code.css,
+        code.js
+      );
 
-      if (error) throw error;
+      if (error) throw new Error(error);
+      if (!data?.project) throw new Error('No project data received');
 
-      setProjectId(data.id);
+      setProjectId(data.project.id);
       setSaveStatus('saved');
-      setTimeout(() => navigate(`/edit/${data.id}`), 1000);
+      setTimeout(() => navigate(`/edit/${data.project.id}`), 1000);
     } catch (error) {
       console.error('Save error:', error);
       setSaveStatus('idle');
     }
-  }, [code, userId, navigate, templateName]);
+  }, [code, navigate, templateName]);
 
   const handleSaveToZip = useCallback(() => {
     const zip = new JSZip();
@@ -1750,9 +2200,9 @@ const DevArea = () => {
     });
   }, [code, templateName]);
 
-  const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
+  const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
-      setCode(prev => ({ ...prev, [language]: value }));
+      setCode(prev => ({ ...prev, [activeTab]: value }));
     }
   };
 
@@ -1774,39 +2224,26 @@ const DevArea = () => {
 
     try {
       const client = new GitHubClient(config.token, config.repo);
-
-      // Проверяем существование репозитория
       const exists = await client.checkRepoExists();
 
       if (!exists) {
-        // Создаем новый репозиторий
         const repoName = config.repo.split('/')[1];
         await client.createRepo(repoName, config.isPrivate);
       }
 
-      // Загружаем файлы
       await client.uploadProject(code, `Обновление: ${templateName}`);
-
-      // Получаем URL репозитория
       const repoUrl = await client.getRepoUrl();
-
-      // Сохраняем настройки
-      localStorage.setItem(`github_token_${userId}`, config.token);
-      localStorage.setItem(`github_repo_${userId}`, config.repo);
 
       setGithubToken(config.token);
       setGithubRepo(config.repo);
       setGithubStatus('success');
 
-      // Показываем ссылку на репозиторий
       window.open(repoUrl, '_blank');
-
       setTimeout(() => setGithubStatus('idle'), 3000);
     } catch (error) {
       console.error('GitHub save error:', error);
       setGithubError(error instanceof Error ? error.message : 'Ошибка при сохранении на GitHub');
       setGithubStatus('error');
-
       setTimeout(() => setGithubStatus('idle'), 5000);
     }
   };
@@ -1887,10 +2324,9 @@ const DevArea = () => {
           }}>
             <div style={{
               ...getViewportStyle(),
-              overflow: 'auto', // Прокрутка сохраняется
-              scrollbarWidth: 'none', // Скрываем полосу в Firefox
-              msOverflowStyle: 'none', // Скрываем полосу в IE/Edge
-              // Скрываем полосу в Chrome/Safari через псевдоэлемент
+              overflow: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
             }}>
               <style>{`
                 div[style*="overflow: auto"]::-webkit-scrollbar {
@@ -1902,7 +2338,7 @@ const DevArea = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="allow-scripts allow-same-origin allow-forms"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
                 width="100%"
                 height="100%"
                 style={{
@@ -1910,7 +2346,7 @@ const DevArea = () => {
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
                   boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
                   backgroundColor: 'white',
-                  overflow: 'hidden' // Запрещаем прокрутку в iframe
+                  overflow: 'hidden'
                 }}
               />
             </div>
@@ -1920,15 +2356,24 @@ const DevArea = () => {
         <div className="editor-section">
           <div className="editor-header">
             <div className="editor-tabs">
-              {(['html', 'css', 'js'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab.toUpperCase()}
-                </button>
-              ))}
+              <button
+                className={`tab-btn ${activeTab === 'html' ? 'active' : ''}`}
+                onClick={() => setActiveTab('html')}
+              >
+                HTML
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'css' ? 'active' : ''}`}
+                onClick={() => setActiveTab('css')}
+              >
+                CSS
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'js' ? 'active' : ''}`}
+                onClick={() => setActiveTab('js')}
+              >
+                JS
+              </button>
             </div>
             <div className="save-buttons">
               <button
@@ -1936,27 +2381,45 @@ const DevArea = () => {
                 onClick={handleSaveToCloud}
                 disabled={saveStatus === 'saving'}
               >
-                {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект в облако редактора кода'}
+                {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить проект в облако'}
               </button>
               <button className="save-btn zip" onClick={handleSaveToZip}>
                 Сохранить в ZIP
               </button>
+              <ImageUploader
+                projectId={projectId || undefined}
+                onImageUploaded={handleImageUploaded}
+                onInsertImage={handleInsertImage}
+              />
             </div>
           </div>
 
           <div className="editor-content">
             <Editor
+              key={editorKey}
               height="100%"
               width="100%"
-              language={activeTab}
+              language={getMonacoLanguage(activeTab)}
               value={code[activeTab]}
-              onChange={(value) => handleEditorChange(value, activeTab)}
+              onChange={handleEditorChange}
               onMount={handleEditorDidMount}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 scrollBeyondLastLine: false,
-                automaticLayout: true
+                automaticLayout: true,
+                wordBasedSuggestions: 'off',
+                suggestOnTriggerCharacters: true,
+                quickSuggestions: {
+                  other: 'on',
+                  comments: 'on',
+                  strings: 'on'
+                },
+                parameterHints: {
+                  enabled: true
+                },
+                formatOnPaste: true,
+                formatOnType: true,
               }}
             />
           </div>
@@ -1980,17 +2443,17 @@ export default DevArea;
 
 /src/panel/EditProgect.tsx
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { supabase } from '../database/supabaseClient';
 import '../style/DevArea/DevArea.css';
 import Logo from '../components/logo/Logo';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
 import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
+import { api } from '../services/api';
 
 interface TemplateFiles {
   html: string;
@@ -2009,132 +2472,7 @@ const VIEWPORT_SIZES = {
 const SAVE_DEBOUNCE_DELAY = 2000;
 const AUTO_SAVE_ENABLED = true;
 
-// Функция для создания HTML с изолированной обработкой якорных ссылок и скрытыми полосами прокрутки
 const createIsolatedHTML = (html: string, css: string, js: string) => {
-  // Добавляем стили для скрытия полос прокрутки, но сохранения функционала
-  const hideScrollbarStyles = `
-    <style>
-      /* Скрываем полосы прокрутки для всех браузеров */
-      html {
-        scrollbar-width: none; /* Firefox */
-        -ms-overflow-style: none; /* IE and Edge */
-      }
-
-      html::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
-      }
-
-      body {
-        overflow: auto; /* Сохраняем возможность прокрутки */
-        -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
-      }
-
-      /* Для элементов с прокруткой внутри */
-      * {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-      }
-
-      *::-webkit-scrollbar {
-        display: none;
-      }
-    </style>
-  `;
-
-  // Скрипт для правильной обработки якорных ссылок внутри iframe
-  const anchorHandler = `
-    <script>
-      (function() {
-        // Функция для прокрутки к элементу по якорю
-        function scrollToAnchor(hash) {
-          if (!hash || hash === '#') return;
-
-          // Убираем символ # для поиска элемента
-          const targetId = hash.substring(1);
-          const targetElement = document.getElementById(targetId);
-
-          if (targetElement) {
-            targetElement.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start'
-            });
-          }
-        }
-
-        // Перехватываем клики по ссылкам с якорями
-        document.addEventListener('click', function(e) {
-          const link = e.target.closest('a');
-          if (!link || !link.hash) return;
-
-          // Проверяем, является ли ссылка якорной (начинается с #)
-          if (link.hash.startsWith('#')) {
-            e.preventDefault();
-
-            // Получаем только хеш часть
-            const hash = link.hash;
-
-            // Прокручиваем к элементу
-            scrollToAnchor(hash);
-
-            // Обновляем хеш в URL iframe (без перезагрузки страницы)
-            if (window.location.hash !== hash) {
-              history.replaceState(null, '', hash);
-            }
-
-            console.log('Anchor navigation:', hash);
-            return false;
-          }
-        });
-
-        // Обрабатываем начальный хеш при загрузке
-        if (window.location.hash) {
-          setTimeout(() => {
-            scrollToAnchor(window.location.hash);
-          }, 100);
-        }
-
-        // Перехватываем изменения хеша
-        window.addEventListener('hashchange', function(e) {
-          e.preventDefault();
-          scrollToAnchor(window.location.hash);
-        });
-
-        // Переопределяем pushState для предотвращения изменения родительского URL
-        const originalPushState = history.pushState;
-        const originalReplaceState = history.replaceState;
-
-        history.pushState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
-          if (typeof url === 'string' && url.startsWith('#')) {
-            scrollToAnchor(url);
-            originalReplaceState.call(this, state, title, url);
-            return;
-          }
-
-          // Для обычных URL предотвращаем навигацию
-          console.log('Navigation prevented in preview mode');
-          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
-        };
-
-        history.replaceState = function(state, title, url) {
-          // Если это якорная ссылка (только хеш)
-          if (typeof url === 'string' && url.startsWith('#')) {
-            scrollToAnchor(url);
-            originalReplaceState.call(this, state, title, url);
-            return;
-          }
-
-          // Для обычных URL предотвращаем навигацию
-          console.log('Navigation prevented in preview mode');
-          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
-        };
-
-        console.log('Anchor links isolation enabled for preview iframe');
-      })();
-    </script>
-  `;
-
-  // Собираем полный HTML с правильной структурой
   return `
 <!DOCTYPE html>
 <html>
@@ -2142,9 +2480,7 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="/">
-    ${hideScrollbarStyles}
     <style>
-      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -2153,28 +2489,162 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
-
-      /* Стили пользователя */
       ${css}
+
+      /* Стили для модального окна alert */
+      .custom-alert {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        z-index: 10000;
+        min-width: 300px;
+        max-width: 500px;
+        font-family: Arial, sans-serif;
+      }
+
+      .custom-alert .message {
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      .custom-alert button {
+        padding: 8px 16px;
+        background: #b9ff66;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        float: right;
+      }
+
+      .custom-alert-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+      }
     </style>
-    ${anchorHandler}
   </head>
   <body>
     ${html}
+
     <script>
-      // Пользовательский JavaScript
-      ${js}
-
-      // Дополнительный код для эмуляции работы якорей
       (function() {
-        // Если есть обработчики на window.onhashchange, сохраняем их
-        const originalOnHashChange = window.onhashchange;
+        // Сохраняем оригинальные методы
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
 
-        window.onhashchange = function(e) {
-          if (originalOnHashChange) {
-            originalOnHashChange.call(this, e);
-          }
+        // Перехватываем добавление обработчиков
+        const handlers = [];
+
+        EventTarget.prototype.addEventListener = function(type, handler, options) {
+          handlers.push({ target: this, type, handler, options });
+          return originalAddEventListener.call(this, type, handler, options);
         };
+
+        // Эмуляция alert если заблокирован
+        if (typeof window.alert !== 'function' || window.alert.toString().includes('sandbox')) {
+          window.alert = function(message) {
+            console.log('[Alert]', message);
+
+            // Создаем overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'custom-alert-overlay';
+
+            // Создаем модальное окно
+            const modal = document.createElement('div');
+            modal.className = 'custom-alert';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.textContent = message;
+
+            const button = document.createElement('button');
+            button.textContent = 'OK';
+            button.onclick = function() {
+              document.body.removeChild(overlay);
+              document.body.removeChild(modal);
+            };
+
+            modal.appendChild(messageDiv);
+            modal.appendChild(button);
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(modal);
+          };
+        }
+
+        // Эмуляция confirm
+        if (typeof window.confirm !== 'function' || window.confirm.toString().includes('sandbox')) {
+          window.confirm = function(message) {
+            console.log('[Confirm]', message);
+            return true; // Всегда возвращаем true для простоты
+          };
+        }
+
+        // Эмуляция prompt
+        if (typeof window.prompt !== 'function' || window.prompt.toString().includes('sandbox')) {
+          window.prompt = function(message, defaultValue) {
+            console.log('[Prompt]', message, defaultValue);
+            return defaultValue || ''; // Возвращаем значение по умолчанию
+          };
+        }
+
+        // Функция для выполнения пользовательского кода
+        function executeUserScript() {
+          try {
+            // Выполняем пользовательский JS
+            eval(${JSON.stringify(js)});
+
+            // Вызываем готовые обработчики если есть
+            if (typeof window.onload === 'function') {
+              window.onload.call(window);
+            }
+
+            if (typeof document.onload === 'function') {
+              document.onload.call(document);
+            }
+
+            console.log('✅ JavaScript выполнен успешно');
+          } catch (error) {
+            console.error('❌ Ошибка JavaScript:', error);
+
+            // Показываем ошибку визуально
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = \`
+              position: fixed;
+              bottom: 20px;
+              right: 20px;
+              background: #ff4444;
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              font-family: monospace;
+              font-size: 14px;
+              z-index: 10000;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              max-width: 400px;
+              word-wrap: break-word;
+            \`;
+            errorDiv.innerHTML = \`<strong>JavaScript Error:</strong> \${error.message}\`;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => errorDiv.remove(), 5000);
+          }
+        }
+
+        // Выполняем после загрузки DOM
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', executeUserScript);
+        } else {
+          executeUserScript();
+        }
       })();
     </script>
   </body>
@@ -2184,7 +2654,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
 
 const EditProject = () => {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
@@ -2199,136 +2668,153 @@ const EditProject = () => {
   const [githubError, setGithubError] = useState('');
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   let saveTimer: NodeJS.Timeout;
 
-  // Загрузка GitHub настроек из БД
-  const loadGithubSettings = useCallback(async (projectId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_projects')
-        .select('github_repo, github_token, github_last_sync')
-        .eq('id', projectId)
-        .single();
+  // Функция для получения правильного языка для Monaco
+  const getMonacoLanguage = (tab: string): string => {
+    switch(tab) {
+      case 'html': return 'html';
+      case 'css': return 'css';
+      case 'js': return 'javascript';
+      default: return 'plaintext';
+    }
+  };
 
-      if (error) throw error;
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
 
-      if (data?.github_repo) {
-        setGithubRepo(data.github_repo);
+    // Принудительно устанавливаем язык
+    const model = editor.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+    }
+
+    // Настройка подсветки JavaScript
+    if (monaco.languages?.typescript?.javascriptDefaults) {
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+      });
+    }
+  };
+
+  useEffect(() => {
+  const handleIframeMessages = (event: MessageEvent) => {
+    // Получаем сообщения из iframe
+    if (event.data?.type === 'console') {
+      console.log(`[Iframe] ${event.data.level}:`, event.data.args);
+    }
+  };
+
+  window.addEventListener('message', handleIframeMessages);
+
+  return () => {
+    window.removeEventListener('message', handleIframeMessages);
+  };
+}, []);
+
+  // Обновляем язык при смене вкладки
+  useEffect(() => {
+    if (editorRef.current) {
+      const monaco = (window as any).monaco;
+      if (monaco) {
+        const model = editorRef.current.getModel();
+        if (model) {
+          monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
+        }
       }
+    }
+  }, [activeTab]);
 
-      if (data?.github_token) {
-        // В реальном проекте токен должен быть зашифрован!
-        setGithubToken(data.github_token);
+  // Добавляем глобальные стили для подсказок
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .monaco-editor .suggest-widget,
+      .monaco-editor .suggest-widget * {
+        color: #333333 !important;
+        background-color: #ffffff !important;
       }
-    } catch (error) {
-      console.error('Error loading GitHub settings:', error);
-    }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+        background-color: #b9ff66 !important;
+        color: #000000 !important;
+      }
+      .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+        color: #000000 !important;
+      }
+      .monaco-editor .token.keyword { color: #0000FF !important; }
+      .monaco-editor .token.string { color: #A31515 !important; }
+      .monaco-editor .token.comment { color: #008000 !important; }
+      .monaco-editor .token.number { color: #098658 !important; }
+      .monaco-editor .token.operator { color: #000000 !important; }
+      .monaco-editor .token.function { color: #795E26 !important; }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
   }, []);
 
-  // Сохранение GitHub настроек в БД
-  const saveGithubSettings = useCallback(async (projectId: string, repo: string, token: string) => {
-    try {
-      // Внимание: В реальном проекте токен должен быть зашифрован перед сохранением!
-      // Это упрощенный вариант для демонстрации
-      const { error } = await supabase
-        .from('user_projects')
-        .update({
-          github_repo: repo,
-          github_token: token, // НЕ ДЕЛАЙТЕ ТАК В РЕАЛЬНОМ ПРОЕКТЕ!
-          github_last_sync: new Date().toISOString()
-        })
-        .eq('id', projectId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error saving GitHub settings:', error);
-      throw error;
-    }
-  }, []);
-
-  // Обновление времени последней синхронизации
-  const updateLastSync = useCallback(async (projectId: string) => {
-    try {
-      await supabase
-        .from('user_projects')
-        .update({
-          github_last_sync: new Date().toISOString()
-        })
-        .eq('id', projectId);
-    } catch (error) {
-      console.error('Error updating last sync:', error);
-    }
-  }, []);
-
-  // Обновление iframe с изолированным контентом
   const updateIframeContent = useCallback(() => {
     const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
     setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now()); // Обновляем ключ для перезагрузки iframe
+    setIframeKey(Date.now());
   }, [code]);
 
   useEffect(() => {
     const loadProject = async () => {
       setIsLoading(true);
       try {
-        // Получаем текущего пользователя
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        const token = api.getToken();
+        if (!token) {
           navigate('/login');
           return;
         }
-        setUserId(user.id);
 
-        const state = location.state as { initialCode?: TemplateFiles } | null;
-
-        if (state?.initialCode) {
-          setCode(state.initialCode);
-          setProjectName('Новый проект из шаблона');
-          setIsLoading(false);
+        const { data: userData, error: userError } = await api.getCurrentUser();
+        if (userError || !userData?.user) {
+          api.clearToken();
+          navigate('/login');
           return;
         }
 
-        if (id) {
-          const { data, error } = await supabase
-            .from('user_projects')
-            .select('html, css, js, name, github_repo, github_token, github_last_sync')
-            .eq('id', id)
-            .single();
+        if (!id) {
+          navigate('/main');
+          return;
+        }
 
-          if (error) throw error;
+        const { data, error } = await api.getProject(id);
 
-          if (data) {
-            const projectData = {
-              html: data.html || '',
-              css: data.css || '',
-              js: data.js || ''
-            };
-            setCode(projectData);
-            setProjectName(data.name || `Проект ${id}`);
+        if (error) throw new Error(error);
+        if (!data?.project) throw new Error('Project not found');
 
-            // Загружаем GitHub настройки
-            if (data.github_repo) {
-              setGithubRepo(data.github_repo);
-            }
-            if (data.github_token) {
-              setGithubToken(data.github_token);
-            }
-          }
+        const project = data.project;
+        setCode({
+          html: project.html || '',
+          css: project.css || '',
+          js: project.js || ''
+        });
+        setProjectName(project.name || `Проект ${id}`);
+
+        if (project.github_repo) {
+          setGithubRepo(project.github_repo);
         }
       } catch (error) {
         console.error('Project loading error:', error);
+        navigate('/main');
       } finally {
         setIsLoading(false);
       }
     };
 
     loadProject();
-  }, [id, location.state, navigate]);
+  }, [id, navigate]);
 
   const saveProject = useCallback(async (currentCode: TemplateFiles) => {
     if (!id || !AUTO_SAVE_ENABLED) return;
@@ -2337,16 +2823,7 @@ const EditProject = () => {
     clearTimeout(saveTimer);
 
     try {
-      const { error } = await supabase
-        .from('user_projects')
-        .update({
-          html: currentCode.html,
-          css: currentCode.css,
-          js: currentCode.js,
-          updated_at: new Date()
-        })
-        .eq('id', id);
-
+      const { error } = await api.updateProject(id, currentCode);
       if (!error) {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
@@ -2357,10 +2834,10 @@ const EditProject = () => {
     }
   }, [id]);
 
-  const handleEditorChange = (value: string | undefined, language: 'html' | 'css' | 'js') => {
+  const handleEditorChange = (value: string | undefined) => {
     if (value === undefined) return;
 
-    const newCode = { ...code, [language]: value };
+    const newCode = { ...code, [activeTab]: value };
     setCode(newCode);
 
     if (AUTO_SAVE_ENABLED && id) {
@@ -2369,7 +2846,6 @@ const EditProject = () => {
     }
   };
 
-  // Обновляем iframe при изменении кода с debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       updateIframeContent();
@@ -2399,7 +2875,6 @@ const EditProject = () => {
     };
   };
 
-  // Функция для вставки текста в редактор
   const insertTextAtCursor = (text: string) => {
     if (!editorRef.current) return;
 
@@ -2432,41 +2907,29 @@ const EditProject = () => {
 
     try {
       const client = new GitHubClient(config.token, config.repo);
-
-      // Проверяем существование репозитория
       const exists = await client.checkRepoExists();
 
       if (!exists) {
-        // Создаем новый репозиторий
         const repoName = config.repo.split('/')[1];
         await client.createRepo(repoName, config.isPrivate);
       }
 
-      // Загружаем файлы
       await client.uploadProject(code, `Обновление: ${projectName}`);
-
-      // Получаем URL репозитория
       const repoUrl = await client.getRepoUrl();
 
-      // Сохраняем настройки в БД
-      await saveGithubSettings(id, config.repo, config.token);
+      const { error } = await api.saveGithubSettings(id, config.repo, config.token);
+      if (error) throw new Error(error);
 
       setGithubRepo(config.repo);
       setGithubToken(config.token);
       setGithubStatus('success');
 
-      // Обновляем время последней синхронизации
-      await updateLastSync(id);
-
-      // Показываем ссылку на репозиторий
       window.open(repoUrl, '_blank');
-
       setTimeout(() => setGithubStatus('idle'), 3000);
     } catch (error) {
       console.error('GitHub save error:', error);
       setGithubError(error instanceof Error ? error.message : 'Ошибка при сохранении на GitHub');
       setGithubStatus('error');
-
       setTimeout(() => setGithubStatus('idle'), 5000);
     }
   };
@@ -2577,9 +3040,9 @@ const EditProject = () => {
           }}>
             <div style={{
               ...getViewportStyle(),
-              overflow: 'auto', // Прокрутка сохраняется
-              scrollbarWidth: 'none', // Скрываем полосу в Firefox
-              msOverflowStyle: 'none', // Скрываем полосу в IE/Edge
+              overflow: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
             }}>
               <style>{`
                 div[style*="overflow: auto"]::-webkit-scrollbar {
@@ -2591,7 +3054,7 @@ const EditProject = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="allow-scripts allow-same-origin allow-forms"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
                 width="100%"
                 height="100%"
                 style={{
@@ -2599,7 +3062,7 @@ const EditProject = () => {
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
                   boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
                   backgroundColor: 'white',
-                  overflow: 'hidden' // Запрещаем прокрутку в iframe
+                  overflow: 'hidden'
                 }}
               />
             </div>
@@ -2609,15 +3072,24 @@ const EditProject = () => {
         <div className="editor-section">
           <div className="editor-header">
             <div className="editor-tabs">
-              {(['html', 'css', 'js'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab.toUpperCase()}
-                </button>
-              ))}
+              <button
+                className={`tab-btn ${activeTab === 'html' ? 'active' : ''}`}
+                onClick={() => setActiveTab('html')}
+              >
+                HTML
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'css' ? 'active' : ''}`}
+                onClick={() => setActiveTab('css')}
+              >
+                CSS
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'js' ? 'active' : ''}`}
+                onClick={() => setActiveTab('js')}
+              >
+                JS
+              </button>
             </div>
             <div className="save-buttons">
               <div className={`save-status ${saveStatus}`}>
@@ -2642,19 +3114,30 @@ const EditProject = () => {
 
           <div className="editor-content">
             <Editor
+              key={editorKey}
               height="100%"
               width="100%"
-              language={activeTab}
+              language={getMonacoLanguage(activeTab)}
               value={code[activeTab]}
-              onChange={(value) => handleEditorChange(value, activeTab)}
-              onMount={(editor) => {
-                editorRef.current = editor;
-              }}
+              onChange={handleEditorChange}
+              onMount={handleEditorDidMount}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 scrollBeyondLastLine: false,
-                automaticLayout: true
+                automaticLayout: true,
+                wordBasedSuggestions: 'off',
+                suggestOnTriggerCharacters: true,
+                quickSuggestions: {
+                  other: 'on',
+                  comments: 'on',
+                  strings: 'on'
+                },
+                parameterHints: {
+                  enabled: true
+                },
+                formatOnPaste: true,
+                formatOnType: true,
               }}
             />
           </div>
@@ -2704,12 +3187,13 @@ export default LoginindSystem;
 /src/panel/Main.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../database/supabaseClient';
 import Logo from '../components/logo/Logo';
 import ExampleCards from '../components/exampleCards/ExampleCards';
+import DragAndDropUploader from '../components/dragAndDropUploader/DragAndDropUploader';
 import '../style/MainPage/Main.css';
 import UserProgects from '../components/userProgects/UserProgects';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
+import { api } from '../services/api';
 
 interface Template {
   id: number;
@@ -2724,19 +3208,32 @@ function Main() {
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const token = api.getToken();
+        console.log('Main - токен:', token ? 'есть' : 'нет');
 
-        if (!user) {
+        if (!token) {
+          console.log('Нет токена, перенаправление на login');
           navigate('/login');
           return;
         }
 
-        // Загружаем шаблоны из папок template1-4
+        const { data: userData, error: userError } = await api.getCurrentUser();
+        console.log('Main - userData:', userData);
+        console.log('Main - userError:', userError);
+
+        if (userError || !userData?.user) {
+          console.log('Ошибка получения пользователя, очищаем токен');
+          api.clearToken();
+          navigate('/login');
+          return;
+        }
+
         const templateFolders = ['template1', 'template2', 'template3', 'template4'];
         const loadedTemplates = await Promise.all(
           templateFolders.map(async (folder, index) => {
@@ -2745,7 +3242,6 @@ function Main() {
               const cssResponse = await fetch(`/template/${folder}/style.css`);
               const jsResponse = await fetch(`/template/${folder}/index.js`);
 
-              // Проверяем успешность загрузки
               if (!htmlResponse.ok || !cssResponse.ok || !jsResponse.ok) {
                 console.warn(`Template ${folder} files not found`);
                 return null;
@@ -2755,7 +3251,6 @@ function Main() {
               const css = await cssResponse.text();
               const js = await jsResponse.text();
 
-              // Извлекаем название из HTML или используем имя папки
               const titleMatch = html.match(/<title>(.*?)<\/title>/i);
               const name = titleMatch ? titleMatch[1] : `Шаблон ${index + 1}`;
 
@@ -2774,10 +3269,8 @@ function Main() {
           })
         );
 
-        // Фильтруем успешно загруженные шаблоны
         const validTemplates = loadedTemplates.filter(t => t !== null) as Template[];
         setTemplates(validTemplates);
-
       } catch (err) {
         console.error('Error loading templates:', err);
       } finally {
@@ -2788,7 +3281,6 @@ function Main() {
     fetchTemplates();
   }, [navigate]);
 
-  // Фильтрация шаблонов по поиску
   const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -2812,7 +3304,18 @@ function Main() {
     <div className="main-container">
       <header className='headerPanel'>
         <Logo createSitePath='main'/>
-        <LogoutButton />
+        <div className="header-actions">
+          <button
+            className="upload-project-btn"
+            onClick={() => setShowUploadModal(true)}
+          >
+            <svg className="upload-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+            </svg>
+            Загрузить свой проект из локальных файлов
+          </button>
+          <LogoutButton />
+        </div>
       </header>
 
       <div className='mainContainer'>
@@ -2823,9 +3326,7 @@ function Main() {
         <div className="templates-section">
           <div className="templates-header">
             <h2>Готовые шаблоны</h2>
-
             <div className="templates-controls">
-              {/* Поиск */}
               <div className="search-container">
                 <input
                   type="text"
@@ -2838,7 +3339,6 @@ function Main() {
             </div>
           </div>
 
-          {/* Сетка шаблонов */}
           <div className="templates-grid">
             {filteredTemplates.length > 0 ? (
               filteredTemplates.map(template => (
@@ -2866,6 +3366,26 @@ function Main() {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно для загрузки проекта */}
+      {showUploadModal && (
+        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
+          <div className="modal-content upload-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Загрузить свой проект из локальных файлов</h3>
+              <button
+                className="modal-close-btn"
+                onClick={() => setShowUploadModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <DragAndDropUploader />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3442,6 +3962,242 @@ const reportWebVitals = (onPerfEntry?: ReportHandler) => {
 export default reportWebVitals;
 
 
+/src/services/api.ts
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+}
+
+interface User {
+  id: number;
+  email: string;
+  full_name?: string;
+  avatar_url?: string;
+  created_at: string;
+  userType: 'user'; // для email/password пользователей
+}
+
+interface OAuthUser {
+  id: number;
+  provider: string;
+  providerId: string;
+  email?: string;
+  full_name?: string;
+  avatar_url?: string;
+  created_at: string;
+  userType: 'oauth'; // для OAuth пользователей
+}
+
+type UserProfile = User | OAuthUser;
+
+interface Project {
+  id: number;
+  ownerType: 'user' | 'oauth';
+  ownerId: number;
+  name: string;
+  html?: string;
+  css?: string;
+  js?: string;
+  github_repo?: string;
+  github_last_sync?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AuthResponse {
+  user: UserProfile;
+  token: string;
+  userType: 'user' | 'oauth';
+}
+
+interface ProjectsResponse {
+  projects: Project[];
+}
+
+interface ProjectResponse {
+  project: Project;
+}
+
+class ApiService {
+  private token: string | null = null;
+
+  constructor() {
+    this.token = localStorage.getItem('auth_token');
+  }
+
+  setToken(token: string) {
+    this.token = token;
+    localStorage.setItem('auth_token', token);
+  }
+
+  getToken(): string | null {
+    return this.token;
+  }
+
+  clearToken() {
+    this.token = null;
+    localStorage.removeItem('auth_token');
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    const url = `${API_URL}${endpoint}`;
+    console.log('🔍 API Request:', {
+      url,
+      method: options.method || 'GET',
+      hasToken: !!this.token
+    });
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...headers,
+          ...options.headers,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ API Error:', data);
+        return { error: data.error || 'Request failed' };
+      }
+
+      console.log('✅ API Success:', data);
+      return { data };
+    } catch (error) {
+      console.error('❌ Network Error:', error);
+      return { error: error instanceof Error ? error.message : 'Network error' };
+    }
+  }
+
+  // Auth endpoints
+  async register(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
+    return this.request<AuthResponse>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
+    return this.request<AuthResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async getCurrentUser(): Promise<ApiResponse<{ user: User }>> {
+    return this.request<{ user: User }>('/api/auth/me');
+  }
+
+  // Projects endpoints
+  async getProjects(): Promise<ApiResponse<ProjectsResponse>> {
+    return this.request<ProjectsResponse>('/api/projects');
+  }
+
+  async createProject(
+    name: string,
+    html: string = '',
+    css: string = '',
+    js: string = ''
+  ): Promise<ApiResponse<ProjectResponse>> {
+    return this.request<ProjectResponse>('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name, html, css, js }),
+    });
+  }
+
+  async getProject(id: string): Promise<ApiResponse<ProjectResponse>> {
+    return this.request<ProjectResponse>(`/api/projects/${id}`);
+  }
+
+  async updateProject(
+    id: string,
+    data: { name?: string; html?: string; css?: string; js?: string }
+  ): Promise<ApiResponse<ProjectResponse>> {
+    return this.request<ProjectResponse>(`/api/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProject(id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/api/projects/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async saveGithubSettings(
+    projectId: string,
+    repo: string,
+    token: string
+  ): Promise<ApiResponse<{ github: any }>> {
+    return this.request<{ github: any }>(`/api/projects/${projectId}/github`, {
+      method: 'POST',
+      body: JSON.stringify({ repo, token }),
+    });
+  }
+
+  // Image endpoints
+  async saveImageInfo(data: {
+    projectId?: string;
+    fileName: string;
+    fileSize: number;
+    contentType: string;
+    storagePath: string;
+    supabaseUrl: string;
+  }) {
+    const response = await this.request<{ image: any }>('/api/images', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId: data.projectId,
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        contentType: data.contentType,
+        storagePath: data.storagePath,
+        supabaseUrl: data.supabaseUrl
+      }),
+    });
+
+    if (response.data?.image && typeof response.data.image.id === 'number') {
+      response.data.image.id = response.data.image.id.toString();
+    }
+
+    return response;
+  }
+
+  async getProjectImages(projectId: string | number) {
+    return this.request<{ images: any[] }>(`/api/images/project/${projectId}`);
+  }
+
+  async deleteImageRecord(id: number) {
+    return this.request<{ message: string }>(`/api/images/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Logout
+  logout() {
+    this.clearToken();
+  }
+}
+
+export const api = new ApiService();
+
+
 /src/setupTests.ts
 // jest-dom adds custom jest matchers for asserting on DOM nodes.
 // allows you to do things like:
@@ -3942,6 +4698,361 @@ import '@testing-library/jest-dom';
 
   .save-status {
     min-width: auto;
+  }
+}
+
+
+/src/style/dragAndDropUploader/DragAndDropUploader.css
+.drag-drop-uploader {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: #f8f9fa;
+  margin-bottom: 20px;
+}
+
+.drop-zone:hover {
+  border-color: #b9ff66;
+  background-color: #f0f0f0;
+}
+
+.drop-zone.dragging {
+  border-color: #b9ff66;
+  background-color: rgba(185, 255, 102, 0.1);
+  transform: scale(1.02);
+}
+
+.drop-zone.uploading {
+  cursor: wait;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-icon {
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.drop-zone-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+.drop-zone-hint {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+}
+
+/* Кнопки загрузки файлов */
+.file-upload-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.upload-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.upload-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.html-btn {
+  background-color: #e44d26;
+}
+
+.html-btn:hover:not(:disabled) {
+  background-color: #d43f1a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(228, 77, 38, 0.3);
+}
+
+.css-btn {
+  background-color: #264de4;
+}
+
+.css-btn:hover:not(:disabled) {
+  background-color: #1f3eb0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(38, 77, 228, 0.3);
+}
+
+.js-btn {
+  background-color: #f7df1e;
+  color: #333;
+}
+
+.js-btn:hover:not(:disabled) {
+  background-color: #e5ce1a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(247, 223, 30, 0.3);
+}
+
+.upload-btn.loaded {
+  background-color: #4CAF50;
+  color: white;
+}
+
+/* Список загруженных файлов */
+.loaded-files {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+}
+
+.loaded-files h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.files-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.file-item:last-child {
+  margin-bottom: 0;
+}
+
+.file-icon {
+  margin-right: 10px;
+  font-size: 16px;
+}
+
+.file-name {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+}
+
+.remove-file-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 5px;
+  transition: color 0.3s ease;
+}
+
+.remove-file-btn:hover {
+  color: #f44336;
+}
+
+/* Название проекта */
+.project-name-section {
+  margin-bottom: 20px;
+}
+
+.project-name-section label {
+  display: block;
+  margin-bottom: 5px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.project-name-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.project-name-input:focus {
+  outline: none;
+  border-color: #b9ff66;
+  box-shadow: 0 0 0 2px rgba(185, 255, 102, 0.2);
+}
+
+/* Кнопки действий */
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.reset-btn,
+.create-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reset-btn {
+  background-color: #e0e0e0;
+  color: #666;
+}
+
+.reset-btn:hover:not(:disabled) {
+  background-color: #d0d0d0;
+}
+
+.reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.create-btn {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.create-btn:hover:not(:disabled) {
+  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+.create-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Ошибки */
+.error-message {
+  margin-top: 15px;
+  padding: 12px;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #ffcdd2;
+}
+
+/* Добавить в конец файла */
+
+/* Указатель мыши для зоны загрузки */
+.drop-zone {
+  cursor: pointer;
+}
+
+.drop-zone.uploading {
+  cursor: wait;
+}
+
+/* Улучшенная типографика */
+.drop-zone-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+.drop-zone-hint {
+  font-size: 14px;
+  color: #999;
+  margin: 5px 0 0 0;
+}
+
+.drop-zone-hint:last-child {
+  margin-bottom: 0;
+}
+
+/* Анимация для иконки */
+.drop-zone:hover .upload-icon {
+  transform: scale(1.05);
+  transition: transform 0.3s ease;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .drag-drop-uploader {
+    padding: 15px;
+  }
+
+  .drop-zone {
+    padding: 25px 20px;
+  }
+
+  .drop-zone-title {
+    font-size: 15px;
+  }
+
+  .drop-zone-hint {
+    font-size: 13px;
+  }
+
+  .file-upload-buttons {
+    flex-direction: column;
+  }
+
+  .upload-btn {
+    width: 100%;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .reset-btn,
+  .create-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .drop-zone {
+    padding: 20px 15px;
+  }
+
+  .upload-icon {
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -4865,6 +5976,124 @@ import '@testing-library/jest-dom';
   margin-bottom: 20px;
 }
 
+/* Кнопка загрузки проекта */
+.upload-project-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-right: 10px;
+}
+
+.upload-project-btn:hover {
+  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+.upload-project-btn .upload-icon {
+  margin-right: 4px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Модальное окно загрузки */
+.upload-modal {
+  max-width: 700px !important;
+  width: 90%;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.modal-close-btn:hover {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .upload-project-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .modal-header {
+    padding: 15px 20px;
+  }
+
+  .modal-header h3 {
+    font-size: 18px;
+  }
+
+  .modal-body {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions {
+    gap: 5px;
+  }
+
+  .upload-project-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .upload-project-btn .upload-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -5612,12 +6841,14 @@ export const loadTemplateFiles = async (templateId: number) => {
 
 /src/utils/uploadImage.ts
 import { supabase } from "../database/supabaseClient";
+import { api } from "../services/api";
 
 export interface UploadedImage {
-  id: string;
+  id: string; // Изменено с string | number на string
   url: string;
   name: string;
   projectId?: string;
+  storagePath?: string;
 }
 
 export const uploadImage = async (file: File, projectId?: string): Promise<UploadedImage> => {
@@ -5641,26 +6872,24 @@ export const uploadImage = async (file: File, projectId?: string): Promise<Uploa
       .from('project-images')
       .getPublicUrl(fileName);
 
-    const { data: imageData, error: dbError } = await supabase
-      .from('portfolio_images')
-      .insert({
-        project_id: projectId,
-        user_id: user.id,
-        storage_path: `project-images/${fileName}`,
-        file_name: file.name,
-        file_size: file.size,
-        content_type: file.type
-      })
-      .select('id, project_id')
-      .single();
+    const { data, error } = await api.saveImageInfo({
+      projectId: projectId,
+      fileName: file.name,
+      fileSize: file.size,
+      contentType: file.type,
+      storagePath: fileName,
+      supabaseUrl: publicUrl
+    });
 
-    if (dbError) throw dbError;
+    if (error) throw new Error(error);
+    if (!data?.image) throw new Error('Failed to save image info');
 
     return {
-      id: imageData.id,
-      url: publicUrl,
-      name: file.name,
-      projectId: imageData.project_id
+      id: data.image.id.toString(), // Конвертируем в строку
+      url: data.image.url,
+      name: data.image.name,
+      projectId: data.image.projectId,
+      storagePath: fileName
     };
   } catch (error) {
     console.error('Upload error:', error);

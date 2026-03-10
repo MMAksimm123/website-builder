@@ -27,87 +27,6 @@ const VIEWPORT_SIZES = {
 };
 
 const createIsolatedHTML = (html: string, css: string, js: string) => {
-  const hideScrollbarStyles = `
-    <style>
-      html {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-      }
-      html::-webkit-scrollbar {
-        display: none;
-      }
-      body {
-        overflow: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      * {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-      }
-      *::-webkit-scrollbar {
-        display: none;
-      }
-    </style>
-  `;
-
-  const anchorHandler = `
-    <script>
-      (function() {
-        function scrollToAnchor(hash) {
-          if (!hash || hash === '#') return;
-          const targetId = hash.substring(1);
-          const targetElement = document.getElementById(targetId);
-          if (targetElement) {
-            targetElement.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start'
-            });
-          }
-        }
-        document.addEventListener('click', function(e) {
-          const link = e.target.closest('a');
-          if (!link || !link.hash) return;
-          if (link.hash.startsWith('#')) {
-            e.preventDefault();
-            const hash = link.hash;
-            scrollToAnchor(hash);
-            if (window.location.hash !== hash) {
-              history.replaceState(null, '', hash);
-            }
-            return false;
-          }
-        });
-        if (window.location.hash) {
-          setTimeout(() => {
-            scrollToAnchor(window.location.hash);
-          }, 100);
-        }
-        window.addEventListener('hashchange', function(e) {
-          e.preventDefault();
-          scrollToAnchor(window.location.hash);
-        });
-        const originalPushState = history.pushState;
-        const originalReplaceState = history.replaceState;
-        history.pushState = function(state, title, url) {
-          if (typeof url === 'string' && url.startsWith('#')) {
-            scrollToAnchor(url);
-            originalReplaceState.call(this, state, title, url);
-            return;
-          }
-          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
-        };
-        history.replaceState = function(state, title, url) {
-          if (typeof url === 'string' && url.startsWith('#')) {
-            scrollToAnchor(url);
-            originalReplaceState.call(this, state, title, url);
-            return;
-          }
-          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
-        };
-      })();
-    </script>
-  `;
-
   return `
 <!DOCTYPE html>
 <html>
@@ -115,7 +34,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="/">
-    ${hideScrollbarStyles}
     <style>
       * {
         box-sizing: border-box;
@@ -126,20 +44,161 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         height: auto;
       }
       ${css}
+
+      /* Стили для модального окна alert */
+      .custom-alert {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        z-index: 10000;
+        min-width: 300px;
+        max-width: 500px;
+        font-family: Arial, sans-serif;
+      }
+
+      .custom-alert .message {
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      .custom-alert button {
+        padding: 8px 16px;
+        background: #b9ff66;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        float: right;
+      }
+
+      .custom-alert-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+      }
     </style>
-    ${anchorHandler}
   </head>
   <body>
     ${html}
+
     <script>
-      ${js}
       (function() {
-        const originalOnHashChange = window.onhashchange;
-        window.onhashchange = function(e) {
-          if (originalOnHashChange) {
-            originalOnHashChange.call(this, e);
-          }
+        // Сохраняем оригинальные методы
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
+
+        // Перехватываем добавление обработчиков
+        const handlers = [];
+
+        EventTarget.prototype.addEventListener = function(type, handler, options) {
+          handlers.push({ target: this, type, handler, options });
+          return originalAddEventListener.call(this, type, handler, options);
         };
+
+        // Эмуляция alert если заблокирован
+        if (typeof window.alert !== 'function' || window.alert.toString().includes('sandbox')) {
+          window.alert = function(message) {
+            console.log('[Alert]', message);
+
+            // Создаем overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'custom-alert-overlay';
+
+            // Создаем модальное окно
+            const modal = document.createElement('div');
+            modal.className = 'custom-alert';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.textContent = message;
+
+            const button = document.createElement('button');
+            button.textContent = 'OK';
+            button.onclick = function() {
+              document.body.removeChild(overlay);
+              document.body.removeChild(modal);
+            };
+
+            modal.appendChild(messageDiv);
+            modal.appendChild(button);
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(modal);
+          };
+        }
+
+        // Эмуляция confirm
+        if (typeof window.confirm !== 'function' || window.confirm.toString().includes('sandbox')) {
+          window.confirm = function(message) {
+            console.log('[Confirm]', message);
+            return true; // Всегда возвращаем true для простоты
+          };
+        }
+
+        // Эмуляция prompt
+        if (typeof window.prompt !== 'function' || window.prompt.toString().includes('sandbox')) {
+          window.prompt = function(message, defaultValue) {
+            console.log('[Prompt]', message, defaultValue);
+            return defaultValue || ''; // Возвращаем значение по умолчанию
+          };
+        }
+
+        // Функция для выполнения пользовательского кода
+        function executeUserScript() {
+          try {
+            // Выполняем пользовательский JS
+            eval(${JSON.stringify(js)});
+
+            // Вызываем готовые обработчики если есть
+            if (typeof window.onload === 'function') {
+              window.onload.call(window);
+            }
+
+            if (typeof document.onload === 'function') {
+              document.onload.call(document);
+            }
+
+            console.log('✅ JavaScript выполнен успешно');
+          } catch (error) {
+            console.error('❌ Ошибка JavaScript:', error);
+
+            // Показываем ошибку визуально
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = \`
+              position: fixed;
+              bottom: 20px;
+              right: 20px;
+              background: #ff4444;
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              font-family: monospace;
+              font-size: 14px;
+              z-index: 10000;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              max-width: 400px;
+              word-wrap: break-word;
+            \`;
+            errorDiv.innerHTML = \`<strong>JavaScript Error:</strong> \${error.message}\`;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => errorDiv.remove(), 5000);
+          }
+        }
+
+        // Выполняем после загрузки DOM
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', executeUserScript);
+        } else {
+          executeUserScript();
+        }
       })();
     </script>
   </body>
@@ -209,6 +268,21 @@ const DevArea = () => {
       }
     }
   }, [activeTab]);
+
+  useEffect(() => {
+  const handleIframeMessages = (event: MessageEvent) => {
+    // Получаем сообщения из iframe
+    if (event.data?.type === 'console') {
+      console.log(`[Iframe] ${event.data.level}:`, event.data.args);
+    }
+  };
+
+  window.addEventListener('message', handleIframeMessages);
+
+  return () => {
+    window.removeEventListener('message', handleIframeMessages);
+  };
+}, []);
 
   // Добавляем глобальные стили для подсказок
   useEffect(() => {
@@ -500,7 +574,7 @@ const DevArea = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="allow-scripts allow-same-origin allow-forms"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
                 width="100%"
                 height="100%"
                 style={{
