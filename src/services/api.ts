@@ -1,5 +1,14 @@
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+// Функция для генерации UUID
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -11,7 +20,7 @@ interface User {
   full_name?: string;
   avatar_url?: string;
   created_at: string;
-  userType: 'user'; // для email/password пользователей
+  userType: 'user';
 }
 
 interface OAuthUser {
@@ -22,7 +31,7 @@ interface OAuthUser {
   full_name?: string;
   avatar_url?: string;
   created_at: string;
-  userType: 'oauth'; // для OAuth пользователей
+  userType: 'oauth';
 }
 
 type UserProfile = User | OAuthUser;
@@ -80,15 +89,24 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    let traceId = localStorage.getItem('trace_id');
+    if (!traceId) {
+      traceId = generateUUID();
+      localStorage.setItem('trace_id', traceId);
+    }
+
     const url = `${API_URL}${endpoint}`;
+
     console.log('🔍 API Request:', {
       url,
       method: options.method || 'GET',
-      hasToken: !!this.token
+      hasToken: !!this.token,
+      traceId
     });
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      'x-trace-id': traceId
     };
 
     if (this.token) {
