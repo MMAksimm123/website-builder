@@ -64,6 +64,20 @@ interface ProjectResponse {
   project: Project;
 }
 
+interface Template {
+  id: number;
+  name: string;
+  description?: string;
+  html: string;
+  css?: string;
+  js?: string;
+  thumbnail_url?: string;
+  is_active?: boolean;
+  created_by?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
 class ApiService {
   private token: string | null = null;
 
@@ -245,6 +259,42 @@ class ApiService {
   // Logout
   logout() {
     this.clearToken();
+  }
+
+    // Templates endpoints
+  async getTemplates(): Promise<ApiResponse<{ templates: Template[] }>> {
+    return this.request<{ templates: Template[] }>('/api/templates');
+  }
+
+  async getTemplate(id: number): Promise<ApiResponse<{ template: Template }>> {
+    return this.request<{ template: Template }>(`/api/templates/${id}`);
+  }
+
+  async createTemplate(data: {
+    name: string;
+    description?: string;
+    html: string;
+    css?: string;
+    js?: string;
+    thumbnail_url?: string;
+  }): Promise<ApiResponse<{ template: Template }>> {
+    return this.request<{ template: Template }>('/api/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTemplate(id: number, data: Partial<Template>): Promise<ApiResponse<{ template: Template }>> {
+    return this.request<{ template: Template }>(`/api/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTemplate(id: number): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/api/templates/${id}`, {
+      method: 'DELETE',
+    });
   }
 }
 
