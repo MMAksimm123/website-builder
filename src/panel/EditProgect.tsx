@@ -29,14 +29,179 @@ const SAVE_DEBOUNCE_DELAY = 2000;
 const AUTO_SAVE_ENABLED = true;
 
 const createIsolatedHTML = (html: string, css: string, js: string) => {
+  const hideScrollbarStyles = `
+    <style>
+      html {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      html::-webkit-scrollbar {
+        display: none;
+      }
+      body {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Базовые стили для iframe */
+      iframe {
+        border: none;
+      }
+    </style>
+  `;
+
+  // Улучшенный скрипт для полной изоляции ссылок и предотвращения навигации
+  const anchorHandler = `
+    <script>
+      (function() {
+        // Функция для прокрутки к элементу по якорю
+        function scrollToAnchor(hash) {
+          if (!hash || hash === '#') return;
+          const targetId = hash.substring(1);
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        }
+
+        // Полная изоляция всех ссылок
+        function handleLinkClick(e) {
+          const link = e.target.closest('a');
+          if (!link) return;
+
+          const href = link.getAttribute('href');
+
+          // Если ссылка пустая или просто '#'
+          if (!href || href === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+
+          // Если ссылка - якорь (начинается с #)
+          if (href.startsWith('#')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const hash = href;
+            scrollToAnchor(hash);
+            // Обновляем хеш в URL iframe без перезагрузки
+            if (window.location.hash !== hash) {
+              history.replaceState(null, '', hash);
+            }
+            return false;
+          }
+
+          // Если ссылка ведет на другой сайт - открываем в новой вкладке
+          if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(href, '_blank');
+            return false;
+          }
+
+          // Для всех остальных ссылок (относительные пути) - блокируем навигацию
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Navigation blocked in preview mode:', href);
+          return false;
+        }
+
+        // Перехватываем все клики на ссылки
+        document.addEventListener('click', handleLinkClick, true);
+
+        // Обрабатываем начальный хеш при загрузке
+        if (window.location.hash) {
+          setTimeout(() => {
+            scrollToAnchor(window.location.hash);
+          }, 100);
+        }
+
+        // Перехватываем изменения хеша
+        window.addEventListener('hashchange', function(e) {
+          e.preventDefault();
+          scrollToAnchor(window.location.hash);
+        });
+
+        // Блокируем все попытки навигации через history API
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function(state, title, url) {
+          // Разрешаем только изменение хеша
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+
+          // Блокируем любую другую навигацию
+          console.log('Navigation blocked (pushState):', url);
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        history.replaceState = function(state, title, url) {
+          // Разрешаем только изменение хеша
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+
+          // Блокируем любую другую навигацию
+          console.log('Navigation blocked (replaceState):', url);
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        // Блокируем переходы по ссылкам через атрибуты target
+        const originalOpen = window.open;
+        window.open = function(url, name, features) {
+          if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            return originalOpen.call(window, url, '_blank', features);
+          }
+          console.log('Window.open blocked:', url);
+          return null;
+        };
+
+        // Блокируем переходы через location
+        const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
+        Object.defineProperty(window.location, 'href', {
+          set: function(value) {
+            if (value && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('//'))) {
+              console.log('Location.href redirect blocked:', value);
+              return;
+            }
+            console.log('Location.href blocked:', value);
+          },
+          get: function() {
+            return originalLocationHref?.get.call(window.location) || '';
+          }
+        });
+
+        console.log('Anchor links isolation enabled for preview iframe');
+      })();
+    </script>
+  `;
+
   return `
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <base href="/">
+    <base target="_self">
+    ${hideScrollbarStyles}
     <style>
+      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -45,162 +210,30 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
+
+      /* Стили пользователя */
       ${css}
-
-      /* Стили для модального окна alert */
-      .custom-alert {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        z-index: 10000;
-        min-width: 300px;
-        max-width: 500px;
-        font-family: Arial, sans-serif;
-      }
-
-      .custom-alert .message {
-        margin-bottom: 20px;
-        color: #333;
-      }
-
-      .custom-alert button {
-        padding: 8px 16px;
-        background: #b9ff66;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        float: right;
-      }
-
-      .custom-alert-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 9999;
-      }
     </style>
+    ${anchorHandler}
   </head>
   <body>
     ${html}
-
     <script>
+      // Пользовательский JavaScript
+      try {
+        ${js}
+      } catch (error) {
+        console.error('Error in user script:', error);
+      }
+
+      // Дополнительный код для совместимости
       (function() {
-        // Сохраняем оригинальные методы
-        const originalAddEventListener = EventTarget.prototype.addEventListener;
-
-        // Перехватываем добавление обработчиков
-        const handlers = [];
-
-        EventTarget.prototype.addEventListener = function(type, handler, options) {
-          handlers.push({ target: this, type, handler, options });
-          return originalAddEventListener.call(this, type, handler, options);
-        };
-
-        // Эмуляция alert если заблокирован
-        if (typeof window.alert !== 'function' || window.alert.toString().includes('sandbox')) {
-          window.alert = function(message) {
-            console.log('[Alert]', message);
-
-            // Создаем overlay
-            const overlay = document.createElement('div');
-            overlay.className = 'custom-alert-overlay';
-
-            // Создаем модальное окно
-            const modal = document.createElement('div');
-            modal.className = 'custom-alert';
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
-            messageDiv.textContent = message;
-
-            const button = document.createElement('button');
-            button.textContent = 'OK';
-            button.onclick = function() {
-              document.body.removeChild(overlay);
-              document.body.removeChild(modal);
-            };
-
-            modal.appendChild(messageDiv);
-            modal.appendChild(button);
-
-            document.body.appendChild(overlay);
-            document.body.appendChild(modal);
-          };
-        }
-
-        // Эмуляция confirm
-        if (typeof window.confirm !== 'function' || window.confirm.toString().includes('sandbox')) {
-          window.confirm = function(message) {
-            console.log('[Confirm]', message);
-            return true; // Всегда возвращаем true для простоты
-          };
-        }
-
-        // Эмуляция prompt
-        if (typeof window.prompt !== 'function' || window.prompt.toString().includes('sandbox')) {
-          window.prompt = function(message, defaultValue) {
-            console.log('[Prompt]', message, defaultValue);
-            return defaultValue || ''; // Возвращаем значение по умолчанию
-          };
-        }
-
-        // Функция для выполнения пользовательского кода
-        function executeUserScript() {
-          try {
-            // Выполняем пользовательский JS
-            eval(${JSON.stringify(js)});
-
-            // Вызываем готовые обработчики если есть
-            if (typeof window.onload === 'function') {
-              window.onload.call(window);
-            }
-
-            if (typeof document.onload === 'function') {
-              document.onload.call(document);
-            }
-
-            console.log('✅ JavaScript выполнен успешно');
-          } catch (error) {
-            console.error('❌ Ошибка JavaScript:', error);
-
-            // Показываем ошибку визуально
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = \`
-              position: fixed;
-              bottom: 20px;
-              right: 20px;
-              background: #ff4444;
-              color: white;
-              padding: 12px 20px;
-              border-radius: 8px;
-              font-family: monospace;
-              font-size: 14px;
-              z-index: 10000;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              max-width: 400px;
-              word-wrap: break-word;
-            \`;
-            errorDiv.innerHTML = \`<strong>JavaScript Error:</strong> \${error.message}\`;
-            document.body.appendChild(errorDiv);
-
-            setTimeout(() => errorDiv.remove(), 5000);
+        const originalOnHashChange = window.onhashchange;
+        window.onhashchange = function(e) {
+          if (originalOnHashChange) {
+            originalOnHashChange.call(this, e);
           }
-        }
-
-        // Выполняем после загрузки DOM
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', executeUserScript);
-        } else {
-          executeUserScript();
-        }
+        };
       })();
     </script>
   </body>
@@ -610,7 +643,7 @@ const EditProject = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
+                sandbox="llow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
                 style={{
