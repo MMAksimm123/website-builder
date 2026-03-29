@@ -12,10 +12,50 @@ code {
     monospace;
 }
 
-.monaco-editor .suggest-widget,
-.monaco-editor .suggest-widget * {
+/* Исправление видимости подсказок Monaco Editor */
+.monaco-editor .suggest-widget {
+  background-color: #ffffff !important;
+  border: 1px solid #ddd !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list {
+  background-color: #ffffff !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row {
   color: #333333 !important;
   background-color: #ffffff !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main .monaco-icon-label {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main .monaco-icon-label .label-name {
+  color: #333333 !important;
+  font-weight: normal !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main .monaco-icon-label .label-description {
+  color: #666666 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .type-label {
+  color: #666666 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .docs {
+  color: #666666 !important;
 }
 
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
@@ -23,13 +63,47 @@ code {
   color: #000000 !important;
 }
 
-.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .contents {
+  color: #000000 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .contents .main .monaco-icon-label .label-name {
   color: #000000 !important;
 }
 
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row .highlight {
   color: #007acc !important;
   font-weight: bold !important;
+}
+
+/* Стили для параметров функций */
+.monaco-editor .parameter-hints-widget {
+  background-color: #ffffff !important;
+  border: 1px solid #ddd !important;
+  color: #333333 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.monaco-editor .parameter-hints-widget .signature {
+  color: #333333 !important;
+}
+
+.monaco-editor .parameter-hints-widget .parameter {
+  color: #333333 !important;
+}
+
+.monaco-editor .parameter-hints-widget .parameter.active {
+  color: #007acc !important;
+  font-weight: bold !important;
+}
+
+/* Стили для иконок в подсказках */
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .icon {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .icon .codicon {
+  color: #333333 !important;
 }
 
 /* Подсветка синтаксиса */

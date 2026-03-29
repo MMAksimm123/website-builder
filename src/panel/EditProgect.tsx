@@ -288,8 +288,63 @@ const EditProject = () => {
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
         allowNonTsExtensions: true,
+        allowJs: true,
+        checkJs: false
+      });
+
+      // Включаем подсказки для JavaScript
+      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false
       });
     }
+
+    // Явно определяем тему с правильными цветами для подсказок
+    monaco.editor.defineTheme('customLight', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: '0000FF' },
+        { token: 'string', foreground: 'A31515' },
+        { token: 'comment', foreground: '008000' },
+        { token: 'number', foreground: '098658' },
+        { token: 'operator', foreground: '000000' },
+        { token: 'function', foreground: '795E26' },
+        { token: 'variable', foreground: '001080' },
+      ],
+      colors: {
+        'editor.background': '#FFFFFF',
+        'editor.foreground': '#000000',
+        'editorSuggestWidget.background': '#FFFFFF',
+        'editorSuggestWidget.border': '#CCCCCC',
+        'editorSuggestWidget.foreground': '#333333',
+        'editorSuggestWidget.highlightForeground': '#007ACC',
+        'editorSuggestWidget.selectedBackground': '#B9FF66',
+        'editorSuggestWidget.selectedForeground': '#000000',
+        'editorHoverWidget.background': '#FFFFFF',
+        'editorHoverWidget.border': '#CCCCCC',
+        'editorHoverWidget.foreground': '#333333',
+        'editorParameterHints.background': '#FFFFFF',
+        'editorParameterHints.border': '#CCCCCC',
+        'editorParameterHints.foreground': '#333333',
+        'list.hoverBackground': '#F0F0F0',
+        'list.hoverForeground': '#333333',
+        'list.focusBackground': '#B9FF66',
+        'list.focusForeground': '#000000',
+        'list.activeSelectionBackground': '#B9FF66',
+        'list.activeSelectionForeground': '#000000',
+        'list.inactiveSelectionBackground': '#E0E0E0',
+        'list.inactiveSelectionForeground': '#333333',
+      }
+    });
+
+    // Применяем тему
+    monaco.editor.setTheme('customLight');
+
+    // Принудительно обновляем подсказки
+    setTimeout(() => {
+      editor.trigger('', 'editor.action.triggerSuggest', {});
+    }, 500);
   };
 
   useEffect(() => {
@@ -723,10 +778,39 @@ const EditProject = () => {
                   strings: 'on'
                 },
                 parameterHints: {
-                  enabled: true
+                  enabled: true,
+                  cycle: true
                 },
                 formatOnPaste: true,
                 formatOnType: true,
+                suggest: {
+                  showKeywords: true,
+                  showSnippets: true,
+                  showClasses: true,
+                  showFunctions: true,
+                  showVariables: true,
+                  showValues: true,
+                  showUnits: true,
+                  showMethods: true,
+                  showFields: true,
+                  showConstructors: true,
+                  showInterfaces: true,
+                  showEvents: true,
+                  showOperators: true,
+                  showReferences: true,
+                  showColors: true,
+                  showConstants: true,
+                  showProperties: true,
+                  showFolders: true,
+                  showEnums: true,
+                  showIssues: true,
+                  showUsers: true,
+                  showFiles: true,
+                },
+                suggestSelection: 'first',
+                acceptSuggestionOnEnter: 'on',
+                tabCompletion: 'on',
+                snippetSuggestions: 'top'
               }}
             />
           </div>

@@ -25,6 +25,35 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>Конструктор сайтов</title>
+    <style>
+      /* Глобальные стили для Monaco Editor подсказок */
+      .monaco-editor .suggest-widget {
+        z-index: 10000 !important;
+      }
+
+      .monaco-editor .suggest-widget .monaco-list-row {
+        line-height: 22px !important;
+        padding: 2px 8px !important;
+      }
+
+      .monaco-editor .suggest-widget .monaco-list-row .contents {
+        display: flex !important;
+        align-items: center !important;
+      }
+
+      .monaco-editor .suggest-widget .monaco-list-row .icon {
+        margin-right: 8px !important;
+      }
+
+      .monaco-editor .suggest-widget .monaco-list-row .label-name {
+        font-weight: 500 !important;
+      }
+
+      .monaco-editor .suggest-widget .monaco-list-row .label-description {
+        font-size: 11px !important;
+        opacity: 0.8 !important;
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
