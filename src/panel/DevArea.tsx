@@ -191,51 +191,51 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
   `;
 
   return `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <base target="_self">
-    ${hideScrollbarStyles}
-    <style>
-      /* Базовые стили для предпросмотра */
-      * {
-        box-sizing: border-box;
-        max-width: 100%;
-      }
-      img {
-        max-width: 100%;
-        height: auto;
-      }
-
-      /* Стили пользователя */
-      ${css}
-    </style>
-    ${anchorHandler}
-  </head>
-  <body>
-    ${html}
-    <script>
-      // Пользовательский JavaScript
-      try {
-        ${js}
-      } catch (error) {
-        console.error('Error in user script:', error);
-      }
-
-      // Дополнительный код для совместимости
-      (function() {
-        const originalOnHashChange = window.onhashchange;
-        window.onhashchange = function(e) {
-          if (originalOnHashChange) {
-            originalOnHashChange.call(this, e);
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <base target="_self">
+        ${hideScrollbarStyles}
+        <style>
+          /* Базовые стили для предпросмотра */
+          * {
+            box-sizing: border-box;
+            max-width: 100%;
           }
-        };
-      })();
-    </script>
-  </body>
-</html>
+          img {
+            max-width: 100%;
+            height: auto;
+          }
+
+          /* Стили пользователя */
+          ${css}
+        </style>
+        ${anchorHandler}
+      </head>
+      <body>
+        ${html}
+        <script>
+          // Пользовательский JavaScript
+          try {
+            ${js}
+          } catch (error) {
+            console.error('Error in user script:', error);
+          }
+
+          // Дополнительный код для совместимости
+          (function() {
+            const originalOnHashChange = window.onhashchange;
+            window.onhashchange = function(e) {
+              if (originalOnHashChange) {
+                originalOnHashChange.call(this, e);
+              }
+            };
+          })();
+        </script>
+      </body>
+    </html>
   `;
 };
 
@@ -279,6 +279,10 @@ const DevArea = () => {
     if (model) {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
+
+    // Прокручиваем редактор в начало (строку 1)
+    editor.setPosition({ lineNumber: 1, column: 1 });
+    editor.revealLine(1, 0); // 0 = Immediate scroll
 
     // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
@@ -344,7 +348,7 @@ const DevArea = () => {
     }, 500);
   };
 
-  // Обновляем язык при смене вкладки
+  // Обновляем язык при смене вкладки и прокручиваем в начало
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -354,23 +358,26 @@ const DevArea = () => {
           monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
         }
       }
+      // Прокручиваем редактор в начало при смене вкладки
+      editorRef.current.setPosition({ lineNumber: 1, column: 1 });
+      editorRef.current.revealLine(1, 0);
     }
   }, [activeTab]);
 
   useEffect(() => {
-  const handleIframeMessages = (event: MessageEvent) => {
-    // Получаем сообщения из iframe
-    if (event.data?.type === 'console') {
-      console.log(`[Iframe] ${event.data.level}:`, event.data.args);
-    }
-  };
+    const handleIframeMessages = (event: MessageEvent) => {
+      // Получаем сообщения из iframe
+      if (event.data?.type === 'console') {
+        console.log(`[Iframe] ${event.data.level}:`, event.data.args);
+      }
+    };
 
-  window.addEventListener('message', handleIframeMessages);
+    window.addEventListener('message', handleIframeMessages);
 
-  return () => {
-    window.removeEventListener('message', handleIframeMessages);
-  };
-}, []);
+    return () => {
+      window.removeEventListener('message', handleIframeMessages);
+    };
+  }, []);
 
   // Добавляем глобальные стили для подсказок
   useEffect(() => {
@@ -488,6 +495,16 @@ const DevArea = () => {
 
     return () => clearTimeout(timer);
   }, [code, updateIframeContent]);
+
+  // При загрузке кода или смене вкладки прокручиваем редактор в начало
+  useEffect(() => {
+    if (editorRef.current) {
+      setTimeout(() => {
+        editorRef.current.setPosition({ lineNumber: 1, column: 1 });
+        editorRef.current.revealLine(1, 0);
+      }, 100);
+    }
+  }, [activeTab, code, editorKey]);
 
   const handleSaveToCloud = useCallback(async () => {
     const projectName = prompt('Название проекта:', templateName);
@@ -662,7 +679,7 @@ const DevArea = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="llow-same-origin allow-scripts allow-forms allow-modals allow-popups"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
                 style={{
@@ -772,7 +789,17 @@ const DevArea = () => {
                 suggestSelection: 'first',
                 acceptSuggestionOnEnter: 'on',
                 tabCompletion: 'on',
-                snippetSuggestions: 'top'
+                snippetSuggestions: 'top',
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'visible',
+                  verticalScrollbarSize: 12,
+                  horizontalScrollbarSize: 12,
+                },
+                scrollBeyondLastColumn: 0,
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
               }}
             />
           </div>

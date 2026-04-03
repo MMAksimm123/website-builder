@@ -1616,10 +1616,50 @@ code {
     monospace;
 }
 
-.monaco-editor .suggest-widget,
-.monaco-editor .suggest-widget * {
+/* Исправление видимости подсказок Monaco Editor */
+.monaco-editor .suggest-widget {
+  background-color: #ffffff !important;
+  border: 1px solid #ddd !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list {
+  background-color: #ffffff !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row {
   color: #333333 !important;
   background-color: #ffffff !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main .monaco-icon-label {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main .monaco-icon-label .label-name {
+  color: #333333 !important;
+  font-weight: normal !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .contents .main .monaco-icon-label .label-description {
+  color: #666666 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .type-label {
+  color: #666666 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .docs {
+  color: #666666 !important;
 }
 
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
@@ -1627,13 +1667,47 @@ code {
   color: #000000 !important;
 }
 
-.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused * {
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .contents {
+  color: #000000 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .contents .main .monaco-icon-label .label-name {
   color: #000000 !important;
 }
 
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row .highlight {
   color: #007acc !important;
   font-weight: bold !important;
+}
+
+/* Стили для параметров функций */
+.monaco-editor .parameter-hints-widget {
+  background-color: #ffffff !important;
+  border: 1px solid #ddd !important;
+  color: #333333 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.monaco-editor .parameter-hints-widget .signature {
+  color: #333333 !important;
+}
+
+.monaco-editor .parameter-hints-widget .parameter {
+  color: #333333 !important;
+}
+
+.monaco-editor .parameter-hints-widget .parameter.active {
+  color: #007acc !important;
+  font-weight: bold !important;
+}
+
+/* Стили для иконок в подсказках */
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .icon {
+  color: #333333 !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .icon .codicon {
+  color: #333333 !important;
 }
 
 /* Подсветка синтаксиса */
@@ -1791,14 +1865,179 @@ const VIEWPORT_SIZES = {
 };
 
 const createIsolatedHTML = (html: string, css: string, js: string) => {
+  const hideScrollbarStyles = `
+    <style>
+      html {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      html::-webkit-scrollbar {
+        display: none;
+      }
+      body {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Базовые стили для iframe */
+      iframe {
+        border: none;
+      }
+    </style>
+  `;
+
+  // Улучшенный скрипт для полной изоляции ссылок и предотвращения навигации
+  const anchorHandler = `
+    <script>
+      (function() {
+        // Функция для прокрутки к элементу по якорю
+        function scrollToAnchor(hash) {
+          if (!hash || hash === '#') return;
+          const targetId = hash.substring(1);
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        }
+
+        // Полная изоляция всех ссылок
+        function handleLinkClick(e) {
+          const link = e.target.closest('a');
+          if (!link) return;
+
+          const href = link.getAttribute('href');
+
+          // Если ссылка пустая или просто '#'
+          if (!href || href === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+
+          // Если ссылка - якорь (начинается с #)
+          if (href.startsWith('#')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const hash = href;
+            scrollToAnchor(hash);
+            // Обновляем хеш в URL iframe без перезагрузки
+            if (window.location.hash !== hash) {
+              history.replaceState(null, '', hash);
+            }
+            return false;
+          }
+
+          // Если ссылка ведет на другой сайт - открываем в новой вкладке
+          if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(href, '_blank');
+            return false;
+          }
+
+          // Для всех остальных ссылок (относительные пути) - блокируем навигацию
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Navigation blocked in preview mode:', href);
+          return false;
+        }
+
+        // Перехватываем все клики на ссылки
+        document.addEventListener('click', handleLinkClick, true);
+
+        // Обрабатываем начальный хеш при загрузке
+        if (window.location.hash) {
+          setTimeout(() => {
+            scrollToAnchor(window.location.hash);
+          }, 100);
+        }
+
+        // Перехватываем изменения хеша
+        window.addEventListener('hashchange', function(e) {
+          e.preventDefault();
+          scrollToAnchor(window.location.hash);
+        });
+
+        // Блокируем все попытки навигации через history API
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function(state, title, url) {
+          // Разрешаем только изменение хеша
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+
+          // Блокируем любую другую навигацию
+          console.log('Navigation blocked (pushState):', url);
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        history.replaceState = function(state, title, url) {
+          // Разрешаем только изменение хеша
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+
+          // Блокируем любую другую навигацию
+          console.log('Navigation blocked (replaceState):', url);
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        // Блокируем переходы по ссылкам через атрибуты target
+        const originalOpen = window.open;
+        window.open = function(url, name, features) {
+          if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            return originalOpen.call(window, url, '_blank', features);
+          }
+          console.log('Window.open blocked:', url);
+          return null;
+        };
+
+        // Блокируем переходы через location
+        const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
+        Object.defineProperty(window.location, 'href', {
+          set: function(value) {
+            if (value && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('//'))) {
+              console.log('Location.href redirect blocked:', value);
+              return;
+            }
+            console.log('Location.href blocked:', value);
+          },
+          get: function() {
+            return originalLocationHref?.get.call(window.location) || '';
+          }
+        });
+
+        console.log('Anchor links isolation enabled for preview iframe');
+      })();
+    </script>
+  `;
+
   return `
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <base href="/">
+    <base target="_self">
+    ${hideScrollbarStyles}
     <style>
+      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -1807,162 +2046,30 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
+
+      /* Стили пользователя */
       ${css}
-
-      /* Стили для модального окна alert */
-      .custom-alert {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        z-index: 10000;
-        min-width: 300px;
-        max-width: 500px;
-        font-family: Arial, sans-serif;
-      }
-
-      .custom-alert .message {
-        margin-bottom: 20px;
-        color: #333;
-      }
-
-      .custom-alert button {
-        padding: 8px 16px;
-        background: #b9ff66;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        float: right;
-      }
-
-      .custom-alert-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 9999;
-      }
     </style>
+    ${anchorHandler}
   </head>
   <body>
     ${html}
-
     <script>
+      // Пользовательский JavaScript
+      try {
+        ${js}
+      } catch (error) {
+        console.error('Error in user script:', error);
+      }
+
+      // Дополнительный код для совместимости
       (function() {
-        // Сохраняем оригинальные методы
-        const originalAddEventListener = EventTarget.prototype.addEventListener;
-
-        // Перехватываем добавление обработчиков
-        const handlers = [];
-
-        EventTarget.prototype.addEventListener = function(type, handler, options) {
-          handlers.push({ target: this, type, handler, options });
-          return originalAddEventListener.call(this, type, handler, options);
-        };
-
-        // Эмуляция alert если заблокирован
-        if (typeof window.alert !== 'function' || window.alert.toString().includes('sandbox')) {
-          window.alert = function(message) {
-            console.log('[Alert]', message);
-
-            // Создаем overlay
-            const overlay = document.createElement('div');
-            overlay.className = 'custom-alert-overlay';
-
-            // Создаем модальное окно
-            const modal = document.createElement('div');
-            modal.className = 'custom-alert';
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
-            messageDiv.textContent = message;
-
-            const button = document.createElement('button');
-            button.textContent = 'OK';
-            button.onclick = function() {
-              document.body.removeChild(overlay);
-              document.body.removeChild(modal);
-            };
-
-            modal.appendChild(messageDiv);
-            modal.appendChild(button);
-
-            document.body.appendChild(overlay);
-            document.body.appendChild(modal);
-          };
-        }
-
-        // Эмуляция confirm
-        if (typeof window.confirm !== 'function' || window.confirm.toString().includes('sandbox')) {
-          window.confirm = function(message) {
-            console.log('[Confirm]', message);
-            return true; // Всегда возвращаем true для простоты
-          };
-        }
-
-        // Эмуляция prompt
-        if (typeof window.prompt !== 'function' || window.prompt.toString().includes('sandbox')) {
-          window.prompt = function(message, defaultValue) {
-            console.log('[Prompt]', message, defaultValue);
-            return defaultValue || ''; // Возвращаем значение по умолчанию
-          };
-        }
-
-        // Функция для выполнения пользовательского кода
-        function executeUserScript() {
-          try {
-            // Выполняем пользовательский JS
-            eval(${JSON.stringify(js)});
-
-            // Вызываем готовые обработчики если есть
-            if (typeof window.onload === 'function') {
-              window.onload.call(window);
-            }
-
-            if (typeof document.onload === 'function') {
-              document.onload.call(document);
-            }
-
-            console.log('✅ JavaScript выполнен успешно');
-          } catch (error) {
-            console.error('❌ Ошибка JavaScript:', error);
-
-            // Показываем ошибку визуально
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = \`
-              position: fixed;
-              bottom: 20px;
-              right: 20px;
-              background: #ff4444;
-              color: white;
-              padding: 12px 20px;
-              border-radius: 8px;
-              font-family: monospace;
-              font-size: 14px;
-              z-index: 10000;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              max-width: 400px;
-              word-wrap: break-word;
-            \`;
-            errorDiv.innerHTML = \`<strong>JavaScript Error:</strong> \${error.message}\`;
-            document.body.appendChild(errorDiv);
-
-            setTimeout(() => errorDiv.remove(), 5000);
+        const originalOnHashChange = window.onhashchange;
+        window.onhashchange = function(e) {
+          if (originalOnHashChange) {
+            originalOnHashChange.call(this, e);
           }
-        }
-
-        // Выполняем после загрузки DOM
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', executeUserScript);
-        } else {
-          executeUserScript();
-        }
+        };
       })();
     </script>
   </body>
@@ -2011,16 +2118,75 @@ const DevArea = () => {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
 
+    // Прокручиваем редактор в начало (строку 1)
+    editor.setPosition({ lineNumber: 1, column: 1 });
+    editor.revealLine(1, 0); // 0 = Immediate scroll
+
     // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
         allowNonTsExtensions: true,
+        allowJs: true,
+        checkJs: false
+      });
+
+      // Включаем подсказки для JavaScript
+      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false
       });
     }
+
+    // Явно определяем тему с правильными цветами для подсказок
+    monaco.editor.defineTheme('customLight', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: '0000FF' },
+        { token: 'string', foreground: 'A31515' },
+        { token: 'comment', foreground: '008000' },
+        { token: 'number', foreground: '098658' },
+        { token: 'operator', foreground: '000000' },
+        { token: 'function', foreground: '795E26' },
+        { token: 'variable', foreground: '001080' },
+      ],
+      colors: {
+        'editor.background': '#FFFFFF',
+        'editor.foreground': '#000000',
+        'editorSuggestWidget.background': '#FFFFFF',
+        'editorSuggestWidget.border': '#CCCCCC',
+        'editorSuggestWidget.foreground': '#333333',
+        'editorSuggestWidget.highlightForeground': '#007ACC',
+        'editorSuggestWidget.selectedBackground': '#B9FF66',
+        'editorSuggestWidget.selectedForeground': '#000000',
+        'editorHoverWidget.background': '#FFFFFF',
+        'editorHoverWidget.border': '#CCCCCC',
+        'editorHoverWidget.foreground': '#333333',
+        'editorParameterHints.background': '#FFFFFF',
+        'editorParameterHints.border': '#CCCCCC',
+        'editorParameterHints.foreground': '#333333',
+        'list.hoverBackground': '#F0F0F0',
+        'list.hoverForeground': '#333333',
+        'list.focusBackground': '#B9FF66',
+        'list.focusForeground': '#000000',
+        'list.activeSelectionBackground': '#B9FF66',
+        'list.activeSelectionForeground': '#000000',
+        'list.inactiveSelectionBackground': '#E0E0E0',
+        'list.inactiveSelectionForeground': '#333333',
+      }
+    });
+
+    // Применяем тему
+    monaco.editor.setTheme('customLight');
+
+    // Принудительно обновляем подсказки
+    setTimeout(() => {
+      editor.trigger('', 'editor.action.triggerSuggest', {});
+    }, 500);
   };
 
-  // Обновляем язык при смене вкладки
+  // Обновляем язык при смене вкладки и прокручиваем в начало
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -2030,23 +2196,26 @@ const DevArea = () => {
           monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
         }
       }
+      // Прокручиваем редактор в начало при смене вкладки
+      editorRef.current.setPosition({ lineNumber: 1, column: 1 });
+      editorRef.current.revealLine(1, 0);
     }
   }, [activeTab]);
 
   useEffect(() => {
-  const handleIframeMessages = (event: MessageEvent) => {
-    // Получаем сообщения из iframe
-    if (event.data?.type === 'console') {
-      console.log(`[Iframe] ${event.data.level}:`, event.data.args);
-    }
-  };
+    const handleIframeMessages = (event: MessageEvent) => {
+      // Получаем сообщения из iframe
+      if (event.data?.type === 'console') {
+        console.log(`[Iframe] ${event.data.level}:`, event.data.args);
+      }
+    };
 
-  window.addEventListener('message', handleIframeMessages);
+    window.addEventListener('message', handleIframeMessages);
 
-  return () => {
-    window.removeEventListener('message', handleIframeMessages);
-  };
-}, []);
+    return () => {
+      window.removeEventListener('message', handleIframeMessages);
+    };
+  }, []);
 
   // Добавляем глобальные стили для подсказок
   useEffect(() => {
@@ -2164,6 +2333,16 @@ const DevArea = () => {
 
     return () => clearTimeout(timer);
   }, [code, updateIframeContent]);
+
+  // При загрузке кода или смене вкладки прокручиваем редактор в начало
+  useEffect(() => {
+    if (editorRef.current) {
+      setTimeout(() => {
+        editorRef.current.setPosition({ lineNumber: 1, column: 1 });
+        editorRef.current.revealLine(1, 0);
+      }, 100);
+    }
+  }, [activeTab, code, editorKey]);
 
   const handleSaveToCloud = useCallback(async () => {
     const projectName = prompt('Название проекта:', templateName);
@@ -2338,7 +2517,7 @@ const DevArea = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
                 style={{
@@ -2416,10 +2595,49 @@ const DevArea = () => {
                   strings: 'on'
                 },
                 parameterHints: {
-                  enabled: true
+                  enabled: true,
+                  cycle: true
                 },
                 formatOnPaste: true,
                 formatOnType: true,
+                suggest: {
+                  showKeywords: true,
+                  showSnippets: true,
+                  showClasses: true,
+                  showFunctions: true,
+                  showVariables: true,
+                  showValues: true,
+                  showUnits: true,
+                  showMethods: true,
+                  showFields: true,
+                  showConstructors: true,
+                  showInterfaces: true,
+                  showEvents: true,
+                  showOperators: true,
+                  showReferences: true,
+                  showColors: true,
+                  showConstants: true,
+                  showProperties: true,
+                  showFolders: true,
+                  showEnums: true,
+                  showIssues: true,
+                  showUsers: true,
+                  showFiles: true,
+                },
+                suggestSelection: 'first',
+                acceptSuggestionOnEnter: 'on',
+                tabCompletion: 'on',
+                snippetSuggestions: 'top',
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'visible',
+                  verticalScrollbarSize: 12,
+                  horizontalScrollbarSize: 12,
+                },
+                scrollBeyondLastColumn: 0,
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
               }}
             />
           </div>
@@ -2473,14 +2691,179 @@ const SAVE_DEBOUNCE_DELAY = 2000;
 const AUTO_SAVE_ENABLED = true;
 
 const createIsolatedHTML = (html: string, css: string, js: string) => {
+  const hideScrollbarStyles = `
+    <style>
+      html {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      html::-webkit-scrollbar {
+        display: none;
+      }
+      body {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Базовые стили для iframe */
+      iframe {
+        border: none;
+      }
+    </style>
+  `;
+
+  // Улучшенный скрипт для полной изоляции ссылок и предотвращения навигации
+  const anchorHandler = `
+    <script>
+      (function() {
+        // Функция для прокрутки к элементу по якорю
+        function scrollToAnchor(hash) {
+          if (!hash || hash === '#') return;
+          const targetId = hash.substring(1);
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        }
+
+        // Полная изоляция всех ссылок
+        function handleLinkClick(e) {
+          const link = e.target.closest('a');
+          if (!link) return;
+
+          const href = link.getAttribute('href');
+
+          // Если ссылка пустая или просто '#'
+          if (!href || href === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+
+          // Если ссылка - якорь (начинается с #)
+          if (href.startsWith('#')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const hash = href;
+            scrollToAnchor(hash);
+            // Обновляем хеш в URL iframe без перезагрузки
+            if (window.location.hash !== hash) {
+              history.replaceState(null, '', hash);
+            }
+            return false;
+          }
+
+          // Если ссылка ведет на другой сайт - открываем в новой вкладке
+          if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(href, '_blank');
+            return false;
+          }
+
+          // Для всех остальных ссылок (относительные пути) - блокируем навигацию
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Navigation blocked in preview mode:', href);
+          return false;
+        }
+
+        // Перехватываем все клики на ссылки
+        document.addEventListener('click', handleLinkClick, true);
+
+        // Обрабатываем начальный хеш при загрузке
+        if (window.location.hash) {
+          setTimeout(() => {
+            scrollToAnchor(window.location.hash);
+          }, 100);
+        }
+
+        // Перехватываем изменения хеша
+        window.addEventListener('hashchange', function(e) {
+          e.preventDefault();
+          scrollToAnchor(window.location.hash);
+        });
+
+        // Блокируем все попытки навигации через history API
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function(state, title, url) {
+          // Разрешаем только изменение хеша
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+
+          // Блокируем любую другую навигацию
+          console.log('Navigation blocked (pushState):', url);
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        history.replaceState = function(state, title, url) {
+          // Разрешаем только изменение хеша
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+
+          // Блокируем любую другую навигацию
+          console.log('Navigation blocked (replaceState):', url);
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        // Блокируем переходы по ссылкам через атрибуты target
+        const originalOpen = window.open;
+        window.open = function(url, name, features) {
+          if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            return originalOpen.call(window, url, '_blank', features);
+          }
+          console.log('Window.open blocked:', url);
+          return null;
+        };
+
+        // Блокируем переходы через location
+        const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
+        Object.defineProperty(window.location, 'href', {
+          set: function(value) {
+            if (value && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('//'))) {
+              console.log('Location.href redirect blocked:', value);
+              return;
+            }
+            console.log('Location.href blocked:', value);
+          },
+          get: function() {
+            return originalLocationHref?.get.call(window.location) || '';
+          }
+        });
+
+        console.log('Anchor links isolation enabled for preview iframe');
+      })();
+    </script>
+  `;
+
   return `
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <base href="/">
+    <base target="_self">
+    ${hideScrollbarStyles}
     <style>
+      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -2489,162 +2872,30 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
+
+      /* Стили пользователя */
       ${css}
-
-      /* Стили для модального окна alert */
-      .custom-alert {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        z-index: 10000;
-        min-width: 300px;
-        max-width: 500px;
-        font-family: Arial, sans-serif;
-      }
-
-      .custom-alert .message {
-        margin-bottom: 20px;
-        color: #333;
-      }
-
-      .custom-alert button {
-        padding: 8px 16px;
-        background: #b9ff66;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        float: right;
-      }
-
-      .custom-alert-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 9999;
-      }
     </style>
+    ${anchorHandler}
   </head>
   <body>
     ${html}
-
     <script>
+      // Пользовательский JavaScript
+      try {
+        ${js}
+      } catch (error) {
+        console.error('Error in user script:', error);
+      }
+
+      // Дополнительный код для совместимости
       (function() {
-        // Сохраняем оригинальные методы
-        const originalAddEventListener = EventTarget.prototype.addEventListener;
-
-        // Перехватываем добавление обработчиков
-        const handlers = [];
-
-        EventTarget.prototype.addEventListener = function(type, handler, options) {
-          handlers.push({ target: this, type, handler, options });
-          return originalAddEventListener.call(this, type, handler, options);
-        };
-
-        // Эмуляция alert если заблокирован
-        if (typeof window.alert !== 'function' || window.alert.toString().includes('sandbox')) {
-          window.alert = function(message) {
-            console.log('[Alert]', message);
-
-            // Создаем overlay
-            const overlay = document.createElement('div');
-            overlay.className = 'custom-alert-overlay';
-
-            // Создаем модальное окно
-            const modal = document.createElement('div');
-            modal.className = 'custom-alert';
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
-            messageDiv.textContent = message;
-
-            const button = document.createElement('button');
-            button.textContent = 'OK';
-            button.onclick = function() {
-              document.body.removeChild(overlay);
-              document.body.removeChild(modal);
-            };
-
-            modal.appendChild(messageDiv);
-            modal.appendChild(button);
-
-            document.body.appendChild(overlay);
-            document.body.appendChild(modal);
-          };
-        }
-
-        // Эмуляция confirm
-        if (typeof window.confirm !== 'function' || window.confirm.toString().includes('sandbox')) {
-          window.confirm = function(message) {
-            console.log('[Confirm]', message);
-            return true; // Всегда возвращаем true для простоты
-          };
-        }
-
-        // Эмуляция prompt
-        if (typeof window.prompt !== 'function' || window.prompt.toString().includes('sandbox')) {
-          window.prompt = function(message, defaultValue) {
-            console.log('[Prompt]', message, defaultValue);
-            return defaultValue || ''; // Возвращаем значение по умолчанию
-          };
-        }
-
-        // Функция для выполнения пользовательского кода
-        function executeUserScript() {
-          try {
-            // Выполняем пользовательский JS
-            eval(${JSON.stringify(js)});
-
-            // Вызываем готовые обработчики если есть
-            if (typeof window.onload === 'function') {
-              window.onload.call(window);
-            }
-
-            if (typeof document.onload === 'function') {
-              document.onload.call(document);
-            }
-
-            console.log('✅ JavaScript выполнен успешно');
-          } catch (error) {
-            console.error('❌ Ошибка JavaScript:', error);
-
-            // Показываем ошибку визуально
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = \`
-              position: fixed;
-              bottom: 20px;
-              right: 20px;
-              background: #ff4444;
-              color: white;
-              padding: 12px 20px;
-              border-radius: 8px;
-              font-family: monospace;
-              font-size: 14px;
-              z-index: 10000;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              max-width: 400px;
-              word-wrap: break-word;
-            \`;
-            errorDiv.innerHTML = \`<strong>JavaScript Error:</strong> \${error.message}\`;
-            document.body.appendChild(errorDiv);
-
-            setTimeout(() => errorDiv.remove(), 5000);
+        const originalOnHashChange = window.onhashchange;
+        window.onhashchange = function(e) {
+          if (originalOnHashChange) {
+            originalOnHashChange.call(this, e);
           }
-        }
-
-        // Выполняем после загрузки DOM
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', executeUserScript);
-        } else {
-          executeUserScript();
-        }
+        };
       })();
     </script>
   </body>
@@ -2699,8 +2950,63 @@ const EditProject = () => {
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
         allowNonTsExtensions: true,
+        allowJs: true,
+        checkJs: false
+      });
+
+      // Включаем подсказки для JavaScript
+      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false
       });
     }
+
+    // Явно определяем тему с правильными цветами для подсказок
+    monaco.editor.defineTheme('customLight', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: '0000FF' },
+        { token: 'string', foreground: 'A31515' },
+        { token: 'comment', foreground: '008000' },
+        { token: 'number', foreground: '098658' },
+        { token: 'operator', foreground: '000000' },
+        { token: 'function', foreground: '795E26' },
+        { token: 'variable', foreground: '001080' },
+      ],
+      colors: {
+        'editor.background': '#FFFFFF',
+        'editor.foreground': '#000000',
+        'editorSuggestWidget.background': '#FFFFFF',
+        'editorSuggestWidget.border': '#CCCCCC',
+        'editorSuggestWidget.foreground': '#333333',
+        'editorSuggestWidget.highlightForeground': '#007ACC',
+        'editorSuggestWidget.selectedBackground': '#B9FF66',
+        'editorSuggestWidget.selectedForeground': '#000000',
+        'editorHoverWidget.background': '#FFFFFF',
+        'editorHoverWidget.border': '#CCCCCC',
+        'editorHoverWidget.foreground': '#333333',
+        'editorParameterHints.background': '#FFFFFF',
+        'editorParameterHints.border': '#CCCCCC',
+        'editorParameterHints.foreground': '#333333',
+        'list.hoverBackground': '#F0F0F0',
+        'list.hoverForeground': '#333333',
+        'list.focusBackground': '#B9FF66',
+        'list.focusForeground': '#000000',
+        'list.activeSelectionBackground': '#B9FF66',
+        'list.activeSelectionForeground': '#000000',
+        'list.inactiveSelectionBackground': '#E0E0E0',
+        'list.inactiveSelectionForeground': '#333333',
+      }
+    });
+
+    // Применяем тему
+    monaco.editor.setTheme('customLight');
+
+    // Принудительно обновляем подсказки
+    setTimeout(() => {
+      editor.trigger('', 'editor.action.triggerSuggest', {});
+    }, 500);
   };
 
   useEffect(() => {
@@ -3054,7 +3360,7 @@ const EditProject = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
+                sandbox="llow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
                 style={{
@@ -3134,10 +3440,39 @@ const EditProject = () => {
                   strings: 'on'
                 },
                 parameterHints: {
-                  enabled: true
+                  enabled: true,
+                  cycle: true
                 },
                 formatOnPaste: true,
                 formatOnType: true,
+                suggest: {
+                  showKeywords: true,
+                  showSnippets: true,
+                  showClasses: true,
+                  showFunctions: true,
+                  showVariables: true,
+                  showValues: true,
+                  showUnits: true,
+                  showMethods: true,
+                  showFields: true,
+                  showConstructors: true,
+                  showInterfaces: true,
+                  showEvents: true,
+                  showOperators: true,
+                  showReferences: true,
+                  showColors: true,
+                  showConstants: true,
+                  showProperties: true,
+                  showFolders: true,
+                  showEnums: true,
+                  showIssues: true,
+                  showUsers: true,
+                  showFiles: true,
+                },
+                suggestSelection: 'first',
+                acceptSuggestionOnEnter: 'on',
+                tabCompletion: 'on',
+                snippetSuggestions: 'top'
               }}
             />
           </div>
@@ -3189,16 +3524,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/logo/Logo';
 import ExampleCards from '../components/exampleCards/ExampleCards';
-import DragAndDropUploader from '../components/dragAndDropUploader/DragAndDropUploader';
 import '../style/MainPage/Main.css';
 import UserProgects from '../components/userProgects/UserProgects';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
 import { api } from '../services/api';
 
+// Обновляем интерфейс Template, делаем поля опциональными для совместимости с API
 interface Template {
   id: number;
   name: string;
-  path: string;
+  description?: string; // делаем опциональным
+  thumbnail_url?: string;
+  created_at: string;
   html: string;
   css: string;
   js: string;
@@ -3208,69 +3545,50 @@ function Main() {
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
         const token = api.getToken();
-        console.log('Main - токен:', token ? 'есть' : 'нет');
 
         if (!token) {
-          console.log('Нет токена, перенаправление на login');
           navigate('/login');
           return;
         }
 
         const { data: userData, error: userError } = await api.getCurrentUser();
-        console.log('Main - userData:', userData);
-        console.log('Main - userError:', userError);
-
         if (userError || !userData?.user) {
-          console.log('Ошибка получения пользователя, очищаем токен');
           api.clearToken();
           navigate('/login');
           return;
         }
 
-        const templateFolders = ['template1', 'template2', 'template3', 'template4'];
-        const loadedTemplates = await Promise.all(
-          templateFolders.map(async (folder, index) => {
-            try {
-              const htmlResponse = await fetch(`/template/${folder}/index.html`);
-              const cssResponse = await fetch(`/template/${folder}/style.css`);
-              const jsResponse = await fetch(`/template/${folder}/index.js`);
+        // Загружаем список шаблонов
+        const { data, error } = await api.getTemplates();
 
-              if (!htmlResponse.ok || !cssResponse.ok || !jsResponse.ok) {
-                console.warn(`Template ${folder} files not found`);
+        if (error) throw new Error(error);
+
+        if (data?.templates) {
+          // Загружаем полные данные каждого шаблона
+          const fullTemplates = await Promise.all(
+            data.templates.map(async (template: { id: number }) => {
+              const { data: fullData, error: templateError } = await api.getTemplate(template.id);
+              if (templateError) {
+                console.error(`Error loading template ${template.id}:`, templateError);
                 return null;
               }
+              return fullData?.template;
+            })
+          );
 
-              const html = await htmlResponse.text();
-              const css = await cssResponse.text();
-              const js = await jsResponse.text();
+          // Фильтруем успешно загруженные шаблоны и приводим к нужному типу
+          const validTemplates = fullTemplates.filter((t): t is Template =>
+            t !== null && t !== undefined
+          );
 
-              const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-              const name = titleMatch ? titleMatch[1] : `Шаблон ${index + 1}`;
-
-              return {
-                id: index + 1,
-                name: name,
-                path: folder,
-                html,
-                css,
-                js
-              };
-            } catch (error) {
-              console.error(`Error loading template ${folder}:`, error);
-              return null;
-            }
-          })
-        );
-
-        const validTemplates = loadedTemplates.filter(t => t !== null) as Template[];
-        setTemplates(validTemplates);
+          setTemplates(validTemplates);
+        }
       } catch (err) {
         console.error('Error loading templates:', err);
       } finally {
@@ -3304,18 +3622,7 @@ function Main() {
     <div className="main-container">
       <header className='headerPanel'>
         <Logo createSitePath='main'/>
-        <div className="header-actions">
-          <button
-            className="upload-project-btn"
-            onClick={() => setShowUploadModal(true)}
-          >
-            <svg className="upload-icon" viewBox="0 0 24 24" width="20" height="20">
-              <path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-            </svg>
-            Загрузить свой проект из локальных файлов
-          </button>
-          <LogoutButton />
-        </div>
+        <LogoutButton />
       </header>
 
       <div className='mainContainer'>
@@ -3366,26 +3673,6 @@ function Main() {
           </div>
         </div>
       </div>
-
-      {/* Модальное окно для загрузки проекта */}
-      {showUploadModal && (
-        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
-          <div className="modal-content upload-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Загрузить свой проект из локальных файлов</h3>
-              <button
-                className="modal-close-btn"
-                onClick={() => setShowUploadModal(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <DragAndDropUploader />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -3965,6 +4252,15 @@ export default reportWebVitals;
 /src/services/api.ts
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+// Функция для генерации UUID
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -3976,7 +4272,7 @@ interface User {
   full_name?: string;
   avatar_url?: string;
   created_at: string;
-  userType: 'user'; // для email/password пользователей
+  userType: 'user';
 }
 
 interface OAuthUser {
@@ -3987,7 +4283,7 @@ interface OAuthUser {
   full_name?: string;
   avatar_url?: string;
   created_at: string;
-  userType: 'oauth'; // для OAuth пользователей
+  userType: 'oauth';
 }
 
 type UserProfile = User | OAuthUser;
@@ -4020,6 +4316,20 @@ interface ProjectResponse {
   project: Project;
 }
 
+interface Template {
+  id: number;
+  name: string;
+  description?: string;
+  html: string;
+  css?: string;
+  js?: string;
+  thumbnail_url?: string;
+  is_active?: boolean;
+  created_by?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
 class ApiService {
   private token: string | null = null;
 
@@ -4045,15 +4355,24 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    let traceId = localStorage.getItem('trace_id');
+    if (!traceId) {
+      traceId = generateUUID();
+      localStorage.setItem('trace_id', traceId);
+    }
+
     const url = `${API_URL}${endpoint}`;
+
     console.log('🔍 API Request:', {
       url,
       method: options.method || 'GET',
-      hasToken: !!this.token
+      hasToken: !!this.token,
+      traceId
     });
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      'x-trace-id': traceId
     };
 
     if (this.token) {
@@ -4192,6 +4511,42 @@ class ApiService {
   // Logout
   logout() {
     this.clearToken();
+  }
+
+    // Templates endpoints
+  async getTemplates(): Promise<ApiResponse<{ templates: Template[] }>> {
+    return this.request<{ templates: Template[] }>('/api/templates');
+  }
+
+  async getTemplate(id: number): Promise<ApiResponse<{ template: Template }>> {
+    return this.request<{ template: Template }>(`/api/templates/${id}`);
+  }
+
+  async createTemplate(data: {
+    name: string;
+    description?: string;
+    html: string;
+    css?: string;
+    js?: string;
+    thumbnail_url?: string;
+  }): Promise<ApiResponse<{ template: Template }>> {
+    return this.request<{ template: Template }>('/api/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTemplate(id: number, data: Partial<Template>): Promise<ApiResponse<{ template: Template }>> {
+    return this.request<{ template: Template }>(`/api/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTemplate(id: number): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/api/templates/${id}`, {
+      method: 'DELETE',
+    });
   }
 }
 
