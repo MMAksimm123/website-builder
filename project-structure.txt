@@ -2029,51 +2029,51 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
   `;
 
   return `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <base target="_self">
-    ${hideScrollbarStyles}
-    <style>
-      /* Базовые стили для предпросмотра */
-      * {
-        box-sizing: border-box;
-        max-width: 100%;
-      }
-      img {
-        max-width: 100%;
-        height: auto;
-      }
-
-      /* Стили пользователя */
-      ${css}
-    </style>
-    ${anchorHandler}
-  </head>
-  <body>
-    ${html}
-    <script>
-      // Пользовательский JavaScript
-      try {
-        ${js}
-      } catch (error) {
-        console.error('Error in user script:', error);
-      }
-
-      // Дополнительный код для совместимости
-      (function() {
-        const originalOnHashChange = window.onhashchange;
-        window.onhashchange = function(e) {
-          if (originalOnHashChange) {
-            originalOnHashChange.call(this, e);
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <base target="_self">
+        ${hideScrollbarStyles}
+        <style>
+          /* Базовые стили для предпросмотра */
+          * {
+            box-sizing: border-box;
+            max-width: 100%;
           }
-        };
-      })();
-    </script>
-  </body>
-</html>
+          img {
+            max-width: 100%;
+            height: auto;
+          }
+
+          /* Стили пользователя */
+          ${css}
+        </style>
+        ${anchorHandler}
+      </head>
+      <body>
+        ${html}
+        <script>
+          // Пользовательский JavaScript
+          try {
+            ${js}
+          } catch (error) {
+            console.error('Error in user script:', error);
+          }
+
+          // Дополнительный код для совместимости
+          (function() {
+            const originalOnHashChange = window.onhashchange;
+            window.onhashchange = function(e) {
+              if (originalOnHashChange) {
+                originalOnHashChange.call(this, e);
+              }
+            };
+          })();
+        </script>
+      </body>
+    </html>
   `;
 };
 
@@ -4229,6 +4229,15 @@ emw:�P�޶6�մ�	�����H\�xr��57�;:����3k��
 
 /src/react-app-env.d.ts
 /// <reference types="react-scripts" />
+declare module '*.css' {
+  const content: { [className: string]: string };
+  export default content;
+}
+
+declare module '*.module.css' {
+  const classes: { readonly [key: string]: string };
+  export default classes;
+}
 
 
 /src/reportWebVitals.ts
