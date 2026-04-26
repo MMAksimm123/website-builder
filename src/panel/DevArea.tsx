@@ -55,11 +55,9 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     </style>
   `;
 
-  // Улучшенный скрипт для полной изоляции ссылок и предотвращения навигации
   const anchorHandler = `
     <script>
       (function() {
-        // Функция для прокрутки к элементу по якорю
         function scrollToAnchor(hash) {
           if (!hash || hash === '#') return;
           const targetId = hash.substring(1);
@@ -72,34 +70,29 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           }
         }
 
-        // Полная изоляция всех ссылок
         function handleLinkClick(e) {
           const link = e.target.closest('a');
           if (!link) return;
 
           const href = link.getAttribute('href');
 
-          // Если ссылка пустая или просто '#'
           if (!href || href === '#') {
             e.preventDefault();
             e.stopPropagation();
             return false;
           }
 
-          // Если ссылка - якорь (начинается с #)
           if (href.startsWith('#')) {
             e.preventDefault();
             e.stopPropagation();
             const hash = href;
             scrollToAnchor(hash);
-            // Обновляем хеш в URL iframe без перезагрузки
             if (window.location.hash !== hash) {
               history.replaceState(null, '', hash);
             }
             return false;
           }
 
-          // Если ссылка ведет на другой сайт - открываем в новой вкладке
           if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
             e.preventDefault();
             e.stopPropagation();
@@ -107,60 +100,48 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             return false;
           }
 
-          // Для всех остальных ссылок (относительные пути) - блокируем навигацию
           e.preventDefault();
           e.stopPropagation();
           console.log('Navigation blocked in preview mode:', href);
           return false;
         }
 
-        // Перехватываем все клики на ссылки
         document.addEventListener('click', handleLinkClick, true);
 
-        // Обрабатываем начальный хеш при загрузке
         if (window.location.hash) {
           setTimeout(() => {
             scrollToAnchor(window.location.hash);
           }, 100);
         }
 
-        // Перехватываем изменения хеша
         window.addEventListener('hashchange', function(e) {
           e.preventDefault();
           scrollToAnchor(window.location.hash);
         });
 
-        // Блокируем все попытки навигации через history API
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
 
         history.pushState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (pushState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
         history.replaceState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (replaceState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
-        // Блокируем переходы по ссылкам через атрибуты target
         const originalOpen = window.open;
         window.open = function(url, name, features) {
           if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
@@ -170,7 +151,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           return null;
         };
 
-        // Блокируем переходы через location
         const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
         Object.defineProperty(window.location, 'href', {
           set: function(value) {
@@ -199,7 +179,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         <base target="_self">
         ${hideScrollbarStyles}
         <style>
-          /* Базовые стили для предпросмотра */
           * {
             box-sizing: border-box;
             max-width: 100%;
@@ -208,8 +187,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             max-width: 100%;
             height: auto;
           }
-
-          /* Стили пользователя */
           ${css}
         </style>
         ${anchorHandler}
@@ -217,14 +194,12 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
       <body>
         ${html}
         <script>
-          // Пользовательский JavaScript
           try {
             ${js}
           } catch (error) {
             console.error('Error in user script:', error);
           }
 
-          // Дополнительный код для совместимости
           (function() {
             const originalOnHashChange = window.onhashchange;
             window.onhashchange = function(e) {
@@ -256,10 +231,10 @@ const DevArea = () => {
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
-  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Функция для получения правильного языка для Monaco
   const getMonacoLanguage = (tab: string): string => {
@@ -274,15 +249,10 @@ const DevArea = () => {
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
 
-    // Принудительно устанавливаем язык
     const model = editor.getModel();
     if (model) {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
-
-    // Прокручиваем редактор в начало (строку 1)
-    editor.setPosition({ lineNumber: 1, column: 1 });
-    editor.revealLine(1, 0); // 0 = Immediate scroll
 
     // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
@@ -293,14 +263,13 @@ const DevArea = () => {
         checkJs: false
       });
 
-      // Включаем подсказки для JavaScript
       monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: false,
         noSyntaxValidation: false
       });
     }
 
-    // Явно определяем тему с правильными цветами для подсказок
+    // Определяем тему
     monaco.editor.defineTheme('customLight', {
       base: 'vs',
       inherit: true,
@@ -339,16 +308,10 @@ const DevArea = () => {
       }
     });
 
-    // Применяем тему
     monaco.editor.setTheme('customLight');
-
-    // Принудительно обновляем подсказки
-    setTimeout(() => {
-      editor.trigger('', 'editor.action.triggerSuggest', {});
-    }, 500);
   };
 
-  // Обновляем язык при смене вкладки и прокручиваем в начало
+  // Обновляем язык при смене вкладки (БЕЗ прокрутки)
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -358,15 +321,11 @@ const DevArea = () => {
           monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
         }
       }
-      // Прокручиваем редактор в начало при смене вкладки
-      editorRef.current.setPosition({ lineNumber: 1, column: 1 });
-      editorRef.current.revealLine(1, 0);
     }
   }, [activeTab]);
 
   useEffect(() => {
     const handleIframeMessages = (event: MessageEvent) => {
-      // Получаем сообщения из iframe
       if (event.data?.type === 'console') {
         console.log(`[Iframe] ${event.data.level}:`, event.data.args);
       }
@@ -438,11 +397,33 @@ const DevArea = () => {
     }
   };
 
+  // Функция обновления iframe с debounce
   const updateIframeContent = useCallback(() => {
-    const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
-    setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now());
+    // Очищаем предыдущий таймер
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+    }
+
+    // Устанавливаем новый таймер
+    updateTimerRef.current = setTimeout(() => {
+      const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
+      setSrcDoc(isolatedHtml);
+      setIframeKey(Date.now());
+      updateTimerRef.current = null;
+    }, 500); // Задержка 500ms
   }, [code]);
+
+  // Запускаем debounced обновление при изменении кода
+  useEffect(() => {
+    updateIframeContent();
+
+    // Очищаем таймер при размонтировании
+    return () => {
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+      }
+    };
+  }, [code, updateIframeContent]);
 
   useEffect(() => {
     const init = async () => {
@@ -487,24 +468,6 @@ const DevArea = () => {
 
     init();
   }, [location.state, navigate]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      updateIframeContent();
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [code, updateIframeContent]);
-
-  // При загрузке кода или смене вкладки прокручиваем редактор в начало
-  useEffect(() => {
-    if (editorRef.current) {
-      setTimeout(() => {
-        editorRef.current.setPosition({ lineNumber: 1, column: 1 });
-        editorRef.current.revealLine(1, 0);
-      }, 100);
-    }
-  }, [activeTab, code, editorKey]);
 
   const handleSaveToCloud = useCallback(async () => {
     const projectName = prompt('Название проекта:', templateName);
@@ -737,7 +700,6 @@ const DevArea = () => {
 
           <div className="editor-content">
             <Editor
-              key={editorKey}
               height="100%"
               width="100%"
               language={getMonacoLanguage(activeTab)}

@@ -222,7 +222,7 @@ const UserProgects = () => {
                       '🗑️'
                     )}
                   </button>
-                  <div className="project-arrow">→</div>
+                  {/* <div className="project-arrow">→</div> */}
                 </div>
               </li>
             ))}
