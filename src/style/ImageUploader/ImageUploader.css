@@ -69,6 +69,13 @@
   border-radius: 14px 0 0 14px;
   outline: none;
   font-size: 14px;
+  font-family: monospace;
+  background: #f8f9fa;
+}
+
+.url-input:focus {
+  background: white;
+  border-color: #B9FF66;
 }
 
 .copy-button {
@@ -78,7 +85,8 @@
   border: none;
   border-radius: 0 14px 14px 0;
   cursor: pointer;
-  transition: background-color 0.35s;
+  transition: all 0.35s ease;
+  min-width: 120px;
 }
 
 .copy-button:hover {
@@ -86,10 +94,23 @@
   color: #191A23;
 }
 
+.copy-button.success {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.copy-hint {
+  font-size: 12px;
+  color: #666;
+  margin: 10px 0;
+  text-align: center;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  margin-top: 15px;
 }
 
 .close-button {

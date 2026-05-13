@@ -1471,7 +1471,7 @@ const UserProgects = () => {
                       '🗑️'
                     )}
                   </button>
-                  <div className="project-arrow">→</div>
+                  {/* <div className="project-arrow">→</div> */}
                 </div>
               </li>
             ))}
@@ -1893,11 +1893,9 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     </style>
   `;
 
-  // Улучшенный скрипт для полной изоляции ссылок и предотвращения навигации
   const anchorHandler = `
     <script>
       (function() {
-        // Функция для прокрутки к элементу по якорю
         function scrollToAnchor(hash) {
           if (!hash || hash === '#') return;
           const targetId = hash.substring(1);
@@ -1910,34 +1908,29 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           }
         }
 
-        // Полная изоляция всех ссылок
         function handleLinkClick(e) {
           const link = e.target.closest('a');
           if (!link) return;
 
           const href = link.getAttribute('href');
 
-          // Если ссылка пустая или просто '#'
           if (!href || href === '#') {
             e.preventDefault();
             e.stopPropagation();
             return false;
           }
 
-          // Если ссылка - якорь (начинается с #)
           if (href.startsWith('#')) {
             e.preventDefault();
             e.stopPropagation();
             const hash = href;
             scrollToAnchor(hash);
-            // Обновляем хеш в URL iframe без перезагрузки
             if (window.location.hash !== hash) {
               history.replaceState(null, '', hash);
             }
             return false;
           }
 
-          // Если ссылка ведет на другой сайт - открываем в новой вкладке
           if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
             e.preventDefault();
             e.stopPropagation();
@@ -1945,60 +1938,48 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             return false;
           }
 
-          // Для всех остальных ссылок (относительные пути) - блокируем навигацию
           e.preventDefault();
           e.stopPropagation();
           console.log('Navigation blocked in preview mode:', href);
           return false;
         }
 
-        // Перехватываем все клики на ссылки
         document.addEventListener('click', handleLinkClick, true);
 
-        // Обрабатываем начальный хеш при загрузке
         if (window.location.hash) {
           setTimeout(() => {
             scrollToAnchor(window.location.hash);
           }, 100);
         }
 
-        // Перехватываем изменения хеша
         window.addEventListener('hashchange', function(e) {
           e.preventDefault();
           scrollToAnchor(window.location.hash);
         });
 
-        // Блокируем все попытки навигации через history API
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
 
         history.pushState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (pushState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
         history.replaceState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (replaceState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
-        // Блокируем переходы по ссылкам через атрибуты target
         const originalOpen = window.open;
         window.open = function(url, name, features) {
           if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
@@ -2008,7 +1989,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           return null;
         };
 
-        // Блокируем переходы через location
         const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
         Object.defineProperty(window.location, 'href', {
           set: function(value) {
@@ -2037,7 +2017,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         <base target="_self">
         ${hideScrollbarStyles}
         <style>
-          /* Базовые стили для предпросмотра */
           * {
             box-sizing: border-box;
             max-width: 100%;
@@ -2046,8 +2025,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             max-width: 100%;
             height: auto;
           }
-
-          /* Стили пользователя */
           ${css}
         </style>
         ${anchorHandler}
@@ -2055,14 +2032,12 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
       <body>
         ${html}
         <script>
-          // Пользовательский JavaScript
           try {
             ${js}
           } catch (error) {
             console.error('Error in user script:', error);
           }
 
-          // Дополнительный код для совместимости
           (function() {
             const originalOnHashChange = window.onhashchange;
             window.onhashchange = function(e) {
@@ -2094,10 +2069,10 @@ const DevArea = () => {
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
-  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Функция для получения правильного языка для Monaco
   const getMonacoLanguage = (tab: string): string => {
@@ -2112,15 +2087,10 @@ const DevArea = () => {
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
 
-    // Принудительно устанавливаем язык
     const model = editor.getModel();
     if (model) {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
-
-    // Прокручиваем редактор в начало (строку 1)
-    editor.setPosition({ lineNumber: 1, column: 1 });
-    editor.revealLine(1, 0); // 0 = Immediate scroll
 
     // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
@@ -2131,14 +2101,13 @@ const DevArea = () => {
         checkJs: false
       });
 
-      // Включаем подсказки для JavaScript
       monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: false,
         noSyntaxValidation: false
       });
     }
 
-    // Явно определяем тему с правильными цветами для подсказок
+    // Определяем тему
     monaco.editor.defineTheme('customLight', {
       base: 'vs',
       inherit: true,
@@ -2177,16 +2146,10 @@ const DevArea = () => {
       }
     });
 
-    // Применяем тему
     monaco.editor.setTheme('customLight');
-
-    // Принудительно обновляем подсказки
-    setTimeout(() => {
-      editor.trigger('', 'editor.action.triggerSuggest', {});
-    }, 500);
   };
 
-  // Обновляем язык при смене вкладки и прокручиваем в начало
+  // Обновляем язык при смене вкладки (БЕЗ прокрутки)
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -2196,15 +2159,11 @@ const DevArea = () => {
           monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
         }
       }
-      // Прокручиваем редактор в начало при смене вкладки
-      editorRef.current.setPosition({ lineNumber: 1, column: 1 });
-      editorRef.current.revealLine(1, 0);
     }
   }, [activeTab]);
 
   useEffect(() => {
     const handleIframeMessages = (event: MessageEvent) => {
-      // Получаем сообщения из iframe
       if (event.data?.type === 'console') {
         console.log(`[Iframe] ${event.data.level}:`, event.data.args);
       }
@@ -2276,11 +2235,33 @@ const DevArea = () => {
     }
   };
 
+  // Функция обновления iframe с debounce
   const updateIframeContent = useCallback(() => {
-    const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
-    setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now());
+    // Очищаем предыдущий таймер
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+    }
+
+    // Устанавливаем новый таймер
+    updateTimerRef.current = setTimeout(() => {
+      const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
+      setSrcDoc(isolatedHtml);
+      setIframeKey(Date.now());
+      updateTimerRef.current = null;
+    }, 500); // Задержка 500ms
   }, [code]);
+
+  // Запускаем debounced обновление при изменении кода
+  useEffect(() => {
+    updateIframeContent();
+
+    // Очищаем таймер при размонтировании
+    return () => {
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+      }
+    };
+  }, [code, updateIframeContent]);
 
   useEffect(() => {
     const init = async () => {
@@ -2325,24 +2306,6 @@ const DevArea = () => {
 
     init();
   }, [location.state, navigate]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      updateIframeContent();
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [code, updateIframeContent]);
-
-  // При загрузке кода или смене вкладки прокручиваем редактор в начало
-  useEffect(() => {
-    if (editorRef.current) {
-      setTimeout(() => {
-        editorRef.current.setPosition({ lineNumber: 1, column: 1 });
-        editorRef.current.revealLine(1, 0);
-      }, 100);
-    }
-  }, [activeTab, code, editorKey]);
 
   const handleSaveToCloud = useCallback(async () => {
     const projectName = prompt('Название проекта:', templateName);
@@ -2575,7 +2538,6 @@ const DevArea = () => {
 
           <div className="editor-content">
             <Editor
-              key={editorKey}
               height="100%"
               width="100%"
               language={getMonacoLanguage(activeTab)}
@@ -3524,6 +3486,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/logo/Logo';
 import ExampleCards from '../components/exampleCards/ExampleCards';
+import DragAndDropUploader from '../components/dragAndDropUploader/DragAndDropUploader';
 import '../style/MainPage/Main.css';
 import UserProgects from '../components/userProgects/UserProgects';
 import LogoutButton from '../components/LogoutButton/LogoutButton';
@@ -3545,6 +3508,7 @@ function Main() {
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -3622,7 +3586,18 @@ function Main() {
     <div className="main-container">
       <header className='headerPanel'>
         <Logo createSitePath='main'/>
-        <LogoutButton />
+        <div className="header-actions">
+          <button
+            className="upload-project-btn"
+            onClick={() => setShowUploadModal(true)}
+          >
+            <svg className="upload-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+            </svg>
+            Загрузить проект
+          </button>
+          <LogoutButton />
+        </div>
       </header>
 
       <div className='mainContainer'>
@@ -3673,6 +3648,26 @@ function Main() {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно для загрузки проекта */}
+      {showUploadModal && (
+        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
+          <div className="modal-content upload-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Загрузить проект</h3>
+              <button
+                className="modal-close-btn"
+                onClick={() => setShowUploadModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <DragAndDropUploader />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7208,20 +7203,78 @@ import { supabase } from "../database/supabaseClient";
 import { api } from "../services/api";
 
 export interface UploadedImage {
-  id: string; // Изменено с string | number на string
+  id: string;
   url: string;
   name: string;
   projectId?: string;
   storagePath?: string;
 }
 
+// Функция для безопасного форматирования имени файла
+const safeFileName = (fileName: string): string => {
+  // Транслитерация русских символов
+  const transliterate = (str: string): string => {
+    const ru: { [key: string]: string } = {
+      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+      'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+      'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+      'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '',
+      'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+      'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'E',
+      'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+      'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U',
+      'Ф': 'F', 'Х': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sch', 'Ъ': '',
+      'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+    };
+
+    return str.replace(/[а-яА-ЯёЁ]/g, (match) => ru[match] || match);
+  };
+
+  // Получаем имя файла без расширения
+  const lastDotIndex = fileName.lastIndexOf('.');
+  const name = lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
+  const ext = lastDotIndex > 0 ? fileName.substring(lastDotIndex) : '';
+
+  // Транслитерация и замена недопустимых символов
+  const safeName = transliterate(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-') // заменяем все спецсимволы на дефис
+    .replace(/-+/g, '-') // убираем множественные дефисы
+    .replace(/^-|-$/g, ''); // убираем дефисы в начале и конце
+
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+
+  return `${safeName}-${timestamp}-${random}${ext}`;
+};
+
 export const uploadImage = async (file: File, projectId?: string): Promise<UploadedImage> => {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) throw new Error('Not authenticated');
+    // Получаем текущего пользователя из локальной БД через API
+    const token = api.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
 
-    const fileName = `${user.id}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+    const { data: userData, error: userError } = await api.getCurrentUser();
+    if (userError || !userData?.user) {
+      throw new Error('Not authenticated');
+    }
 
+    const userId = userData.user.id;
+    // Формируем безопасное имя файла
+    const originalExt = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const safeName = safeFileName(file.name);
+    const fileName = `${userId}/${safeName}.${originalExt}`;
+
+    console.log('Uploading file:', {
+      originalName: file.name,
+      safeName: fileName,
+      size: file.size,
+      type: file.type
+    });
+
+    // Загружаем в Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from('project-images')
       .upload(fileName, file, {
@@ -7230,12 +7283,16 @@ export const uploadImage = async (file: File, projectId?: string): Promise<Uploa
         contentType: file.type
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      throw uploadError;
+    }
 
     const { data: { publicUrl } } = supabase.storage
       .from('project-images')
       .getPublicUrl(fileName);
 
+    // Сохраняем информацию в локальной БД
     const { data, error } = await api.saveImageInfo({
       projectId: projectId,
       fileName: file.name,
@@ -7249,9 +7306,9 @@ export const uploadImage = async (file: File, projectId?: string): Promise<Uploa
     if (!data?.image) throw new Error('Failed to save image info');
 
     return {
-      id: data.image.id.toString(), // Конвертируем в строку
+      id: data.image.id.toString(),
       url: data.image.url,
-      name: data.image.name,
+      name: file.name,
       projectId: data.image.projectId,
       storagePath: fileName
     };

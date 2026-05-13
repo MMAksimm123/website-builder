@@ -10,7 +10,7 @@ interface CustomLoginingProps {
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-const Registration = ({ createPath = "/login" }: CustomLoginingProps) => {
+const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
