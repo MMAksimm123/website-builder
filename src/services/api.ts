@@ -111,7 +111,7 @@ class ApiService {
 
     const url = `${API_URL}${endpoint}`;
 
-    console.log('🔍 API Request:', {
+    console.log('API Request:', {
       url,
       method: options.method || 'GET',
       hasToken: !!this.token,
@@ -139,14 +139,14 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('❌ API Error:', data);
+        console.error('API Error:', data);
         return { error: data.error || 'Request failed' };
       }
 
-      console.log('✅ API Success:', data);
+      console.log('API Success:', data);
       return { data };
     } catch (error) {
-      console.error('❌ Network Error:', error);
+      console.error('Network Error:', error);
       return { error: error instanceof Error ? error.message : 'Network error' };
     }
   }
@@ -295,6 +295,10 @@ class ApiService {
     return this.request<{ message: string }>(`/api/templates/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  async getPublicProject(id: string): Promise<ApiResponse<{ project: Project }>> {
+    return this.request<{ project: Project }>(`/api/projects/public/${id}`);
   }
 }
 

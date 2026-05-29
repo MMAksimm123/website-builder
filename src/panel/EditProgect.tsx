@@ -10,6 +10,7 @@ import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
 import { api } from '../services/api';
+import ShareModal from '../components/ShareModal/ShareModal';
 
 interface TemplateFiles {
   html: string;
@@ -50,18 +51,15 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         display: none;
       }
 
-      /* Базовые стили для iframe */
       iframe {
         border: none;
       }
     </style>
   `;
 
-  // Улучшенный скрипт для полной изоляции ссылок и предотвращения навигации
   const anchorHandler = `
     <script>
       (function() {
-        // Функция для прокрутки к элементу по якорю
         function scrollToAnchor(hash) {
           if (!hash || hash === '#') return;
           const targetId = hash.substring(1);
@@ -74,34 +72,29 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           }
         }
 
-        // Полная изоляция всех ссылок
         function handleLinkClick(e) {
           const link = e.target.closest('a');
           if (!link) return;
 
           const href = link.getAttribute('href');
 
-          // Если ссылка пустая или просто '#'
           if (!href || href === '#') {
             e.preventDefault();
             e.stopPropagation();
             return false;
           }
 
-          // Если ссылка - якорь (начинается с #)
           if (href.startsWith('#')) {
             e.preventDefault();
             e.stopPropagation();
             const hash = href;
             scrollToAnchor(hash);
-            // Обновляем хеш в URL iframe без перезагрузки
             if (window.location.hash !== hash) {
               history.replaceState(null, '', hash);
             }
             return false;
           }
 
-          // Если ссылка ведет на другой сайт - открываем в новой вкладке
           if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
             e.preventDefault();
             e.stopPropagation();
@@ -109,60 +102,48 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             return false;
           }
 
-          // Для всех остальных ссылок (относительные пути) - блокируем навигацию
           e.preventDefault();
           e.stopPropagation();
           console.log('Navigation blocked in preview mode:', href);
           return false;
         }
 
-        // Перехватываем все клики на ссылки
         document.addEventListener('click', handleLinkClick, true);
 
-        // Обрабатываем начальный хеш при загрузке
         if (window.location.hash) {
           setTimeout(() => {
             scrollToAnchor(window.location.hash);
           }, 100);
         }
 
-        // Перехватываем изменения хеша
         window.addEventListener('hashchange', function(e) {
           e.preventDefault();
           scrollToAnchor(window.location.hash);
         });
 
-        // Блокируем все попытки навигации через history API
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
 
         history.pushState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (pushState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
         history.replaceState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (replaceState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
-        // Блокируем переходы по ссылкам через атрибуты target
         const originalOpen = window.open;
         window.open = function(url, name, features) {
           if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
@@ -172,7 +153,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           return null;
         };
 
-        // Блокируем переходы через location
         const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
         Object.defineProperty(window.location, 'href', {
           set: function(value) {
@@ -186,8 +166,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             return originalLocationHref?.get.call(window.location) || '';
           }
         });
-
-        console.log('Anchor links isolation enabled for preview iframe');
       })();
     </script>
   `;
@@ -201,7 +179,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <base target="_self">
     ${hideScrollbarStyles}
     <style>
-      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -210,8 +187,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
-
-      /* Стили пользователя */
       ${css}
     </style>
     ${anchorHandler}
@@ -219,14 +194,12 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
   <body>
     ${html}
     <script>
-      // Пользовательский JavaScript
       try {
         ${js}
       } catch (error) {
         console.error('Error in user script:', error);
       }
 
-      // Дополнительный код для совместимости
       (function() {
         const originalOnHashChange = window.onhashchange;
         window.onhashchange = function(e) {
@@ -253,18 +226,19 @@ const EditProject = () => {
   const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
   const [iframeKey, setIframeKey] = useState(Date.now());
   const [showGithubModal, setShowGithubModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [githubStatus, setGithubStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [githubError, setGithubError] = useState('');
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollPositionRef = useRef<number>(0);
   let saveTimer: NodeJS.Timeout;
 
-  // Функция для получения правильного языка для Monaco
   const getMonacoLanguage = (tab: string): string => {
     switch(tab) {
       case 'html': return 'html';
@@ -277,13 +251,11 @@ const EditProject = () => {
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
 
-    // Принудительно устанавливаем язык
     const model = editor.getModel();
     if (model) {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
 
-    // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
@@ -292,14 +264,12 @@ const EditProject = () => {
         checkJs: false
       });
 
-      // Включаем подсказки для JavaScript
       monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: false,
         noSyntaxValidation: false
       });
     }
 
-    // Явно определяем тему с правильными цветами для подсказок
     monaco.editor.defineTheme('customLight', {
       base: 'vs',
       inherit: true,
@@ -338,31 +308,9 @@ const EditProject = () => {
       }
     });
 
-    // Применяем тему
     monaco.editor.setTheme('customLight');
-
-    // Принудительно обновляем подсказки
-    setTimeout(() => {
-      editor.trigger('', 'editor.action.triggerSuggest', {});
-    }, 500);
   };
 
-  useEffect(() => {
-  const handleIframeMessages = (event: MessageEvent) => {
-    // Получаем сообщения из iframe
-    if (event.data?.type === 'console') {
-      console.log(`[Iframe] ${event.data.level}:`, event.data.args);
-    }
-  };
-
-  window.addEventListener('message', handleIframeMessages);
-
-  return () => {
-    window.removeEventListener('message', handleIframeMessages);
-  };
-}, []);
-
-  // Обновляем язык при смене вкладки
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -375,7 +323,6 @@ const EditProject = () => {
     }
   }, [activeTab]);
 
-  // Добавляем глобальные стили для подсказок
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -399,17 +346,70 @@ const EditProject = () => {
       .monaco-editor .token.function { color: #795E26 !important; }
     `;
     document.head.appendChild(style);
-
     return () => {
-      document.head.removeChild(style);
+      if (style && style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
     };
   }, []);
 
+  const saveScrollPosition = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        const scrollY = iframeRef.current.contentWindow.scrollY;
+        if (typeof scrollY === 'number' && !isNaN(scrollY)) {
+          scrollPositionRef.current = scrollY;
+        }
+      } catch (e) {}
+    }
+  };
+
+  const restoreScrollPosition = useCallback(() => {
+    if (iframeRef.current && iframeRef.current.contentWindow && scrollPositionRef.current > 0) {
+      try {
+        iframeRef.current.contentWindow.scrollTo(0, scrollPositionRef.current);
+      } catch (e) {}
+    }
+  }, []);
+
+  const handleIframeLoad = useCallback(() => {
+    restoreScrollPosition();
+  }, [restoreScrollPosition]);
+
+  useEffect(() => {
+    const handleIframeMessages = (event: MessageEvent) => {
+      if (event.data?.type === 'console') {
+        console.log(`[Iframe] ${event.data.level}:`, event.data.args);
+      }
+    };
+
+    window.addEventListener('message', handleIframeMessages);
+    return () => window.removeEventListener('message', handleIframeMessages);
+  }, []);
+
   const updateIframeContent = useCallback(() => {
-    const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
-    setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now());
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+    }
+
+    saveScrollPosition();
+
+    updateTimerRef.current = setTimeout(() => {
+      const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
+      setSrcDoc(isolatedHtml);
+      setIframeKey(prev => prev + 1);
+      updateTimerRef.current = null;
+    }, 500);
   }, [code]);
+
+  useEffect(() => {
+    updateIframeContent();
+    return () => {
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+      }
+    };
+  }, [code, updateIframeContent]);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -489,14 +489,6 @@ const EditProject = () => {
       saveTimer = setTimeout(() => saveProject(newCode), SAVE_DEBOUNCE_DELAY);
     }
   };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      updateIframeContent();
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [code, updateIframeContent]);
 
   const handleSaveToZip = () => {
     const zip = new JSZip();
@@ -601,6 +593,16 @@ const EditProject = () => {
         <h2 className="project-title">Редактирование: {projectName}</h2>
         <div className="header-actions">
           <button
+            className="share-btn"
+            onClick={() => setShowShareModal(true)}
+            title="Поделиться проектом"
+          >
+            <svg className="share-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+            Поделиться
+          </button>
+          <button
             className={`github-btn ${githubStatus}`}
             onClick={() => setShowGithubModal(true)}
             disabled={githubStatus === 'saving'}
@@ -611,7 +613,7 @@ const EditProject = () => {
             ) : githubStatus === 'success' ? (
               '✓ Сохранено'
             ) : githubStatus === 'error' ? (
-              '❌ Ошибка'
+              'Ошибка'
             ) : (
               <>
                 <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20">
@@ -633,7 +635,7 @@ const EditProject = () => {
 
       {githubRepo && (
         <div className="github-info-banner">
-          <span>📦 Репозиторий: {githubRepo}</span>
+          <span>Репозиторий: {githubRepo}</span>
           <a
             href={`https://github.com/${githubRepo}`}
             target="_blank"
@@ -652,21 +654,21 @@ const EditProject = () => {
             onClick={() => setViewportSize('desktop')}
             title="Десктоп"
           >
-            💻 Десктоп
+            Десктоп
           </button>
           <button
             className={`viewport-btn tablet ${viewportSize === 'tablet' ? 'active' : ''}`}
             onClick={() => setViewportSize('tablet')}
             title="Планшет"
           >
-            📱 Планшет
+            Планшет
           </button>
           <button
             className={`viewport-btn mobile ${viewportSize === 'mobile' ? 'active' : ''}`}
             onClick={() => setViewportSize('mobile')}
             title="Мобильный"
           >
-            📱 Мобильный
+            Мобильный
           </button>
         </div>
       </div>
@@ -698,9 +700,10 @@ const EditProject = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="llow-same-origin allow-scripts allow-forms allow-modals allow-popups"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
+                onLoad={handleIframeLoad}
                 style={{
                   border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
@@ -758,7 +761,6 @@ const EditProject = () => {
 
           <div className="editor-content">
             <Editor
-              key={editorKey}
               height="100%"
               width="100%"
               language={getMonacoLanguage(activeTab)}
@@ -810,12 +812,29 @@ const EditProject = () => {
                 suggestSelection: 'first',
                 acceptSuggestionOnEnter: 'on',
                 tabCompletion: 'on',
-                snippetSuggestions: 'top'
+                snippetSuggestions: 'top',
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'visible',
+                  verticalScrollbarSize: 12,
+                  horizontalScrollbarSize: 12,
+                },
+                scrollBeyondLastColumn: 0,
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
               }}
             />
           </div>
         </div>
       </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        projectId={parseInt(id!)}
+        projectName={projectName}
+      />
 
       {showGithubModal && (
         <GithubSetup

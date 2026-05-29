@@ -11,6 +11,7 @@ import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
 import { api } from '../services/api';
+import ShareModal from '../components/ShareModal/ShareModal';
 
 const DEFAULT_TEMPLATE = {
   html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
@@ -48,7 +49,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         display: none;
       }
 
-      /* Базовые стили для iframe */
       iframe {
         border: none;
       }
@@ -226,17 +226,20 @@ const DevArea = () => {
   const [templateName, setTemplateName] = useState<string>('Новый проект');
   const [iframeKey, setIframeKey] = useState(Date.now());
   const [showGithubModal, setShowGithubModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [githubStatus, setGithubStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [githubError, setGithubError] = useState('');
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [isProjectSaved, setIsProjectSaved] = useState(false);
+
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollPositionRef = useRef<number>(0);
 
-  // Функция для получения правильного языка для Monaco
   const getMonacoLanguage = (tab: string): string => {
     switch(tab) {
       case 'html': return 'html';
@@ -254,7 +257,6 @@ const DevArea = () => {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
 
-    // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
@@ -269,7 +271,6 @@ const DevArea = () => {
       });
     }
 
-    // Определяем тему
     monaco.editor.defineTheme('customLight', {
       base: 'vs',
       inherit: true,
@@ -311,7 +312,6 @@ const DevArea = () => {
     monaco.editor.setTheme('customLight');
   };
 
-  // Обновляем язык при смене вкладки (БЕЗ прокрутки)
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -324,6 +324,29 @@ const DevArea = () => {
     }
   }, [activeTab]);
 
+  const saveScrollPosition = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        const scrollY = iframeRef.current.contentWindow.scrollY;
+        if (typeof scrollY === 'number' && !isNaN(scrollY)) {
+          scrollPositionRef.current = scrollY;
+        }
+      } catch (e) {}
+    }
+  };
+
+  const restoreScrollPosition = useCallback(() => {
+    if (iframeRef.current && iframeRef.current.contentWindow && scrollPositionRef.current > 0) {
+      try {
+        iframeRef.current.contentWindow.scrollTo(0, scrollPositionRef.current);
+      } catch (e) {}
+    }
+  }, []);
+
+  const handleIframeLoad = useCallback(() => {
+    restoreScrollPosition();
+  }, [restoreScrollPosition]);
+
   useEffect(() => {
     const handleIframeMessages = (event: MessageEvent) => {
       if (event.data?.type === 'console') {
@@ -332,13 +355,9 @@ const DevArea = () => {
     };
 
     window.addEventListener('message', handleIframeMessages);
-
-    return () => {
-      window.removeEventListener('message', handleIframeMessages);
-    };
+    return () => window.removeEventListener('message', handleIframeMessages);
   }, []);
 
-  // Добавляем глобальные стили для подсказок
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -362,15 +381,15 @@ const DevArea = () => {
       .monaco-editor .token.function { color: #795E26 !important; }
     `;
     document.head.appendChild(style);
-
     return () => {
-      document.head.removeChild(style);
+      if (style && style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
     };
   }, []);
 
   const insertTextAtCursor = (text: string) => {
     if (!editorRef.current) return;
-
     const selection = editorRef.current.getSelection();
     const range = {
       startLineNumber: selection.startLineNumber,
@@ -378,7 +397,6 @@ const DevArea = () => {
       endLineNumber: selection.endLineNumber,
       endColumn: selection.endColumn
     };
-
     editorRef.current.executeEdits('insert-image', [{
       range,
       text: text,
@@ -397,27 +415,23 @@ const DevArea = () => {
     }
   };
 
-  // Функция обновления iframe с debounce
   const updateIframeContent = useCallback(() => {
-    // Очищаем предыдущий таймер
     if (updateTimerRef.current) {
       clearTimeout(updateTimerRef.current);
     }
 
-    // Устанавливаем новый таймер
+    saveScrollPosition();
+
     updateTimerRef.current = setTimeout(() => {
       const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
       setSrcDoc(isolatedHtml);
-      setIframeKey(Date.now());
+      setIframeKey(prev => prev + 1);
       updateTimerRef.current = null;
-    }, 500); // Задержка 500ms
+    }, 500);
   }, [code]);
 
-  // Запускаем debounced обновление при изменении кода
   useEffect(() => {
     updateIframeContent();
-
-    // Очищаем таймер при размонтировании
     return () => {
       if (updateTimerRef.current) {
         clearTimeout(updateTimerRef.current);
@@ -487,6 +501,7 @@ const DevArea = () => {
 
       setProjectId(data.project.id);
       setSaveStatus('saved');
+      setIsProjectSaved(true);
       setTimeout(() => navigate(`/edit/${data.project.id}`), 1000);
     } catch (error) {
       console.error('Save error:', error);
@@ -559,6 +574,16 @@ const DevArea = () => {
         <h2 className="project-title">{templateName}</h2>
         <div className="header-actions">
           <button
+            className="share-btn"
+            onClick={() => setShowShareModal(true)}
+            title="Поделиться проектом"
+          >
+            <svg className="share-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+            Поделиться
+          </button>
+          <button
             className={`github-btn ${githubStatus}`}
             onClick={() => setShowGithubModal(true)}
             disabled={githubStatus === 'saving'}
@@ -569,7 +594,7 @@ const DevArea = () => {
             ) : githubStatus === 'success' ? (
               '✓ Сохранено'
             ) : githubStatus === 'error' ? (
-              '❌ Ошибка'
+              'Ошибка'
             ) : (
               <>
                 <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20">
@@ -596,21 +621,21 @@ const DevArea = () => {
             onClick={() => setViewportSize('desktop')}
             title="Десктоп"
           >
-            💻 Десктоп
+            Десктоп
           </button>
           <button
             className={`viewport-btn tablet ${viewportSize === 'tablet' ? 'active' : ''}`}
             onClick={() => setViewportSize('tablet')}
             title="Планшет"
           >
-            📱 Планшет
+            Планшет
           </button>
           <button
             className={`viewport-btn mobile ${viewportSize === 'mobile' ? 'active' : ''}`}
             onClick={() => setViewportSize('mobile')}
             title="Мобильный"
           >
-            📱 Мобильный
+            Мобильный
           </button>
         </div>
       </div>
@@ -645,6 +670,7 @@ const DevArea = () => {
                 sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
+                onLoad={handleIframeLoad}
                 style={{
                   border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
@@ -767,6 +793,17 @@ const DevArea = () => {
           </div>
         </div>
       </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        projectId={projectId || 0}
+        projectName={templateName}
+        isSaved={isProjectSaved}
+        onSave={async () => {
+          await handleSaveToCloud();
+        }}
+      />
 
       {showGithubModal && (
         <GithubSetup
