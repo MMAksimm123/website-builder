@@ -1320,6 +1320,230 @@ const Registration = ({ createPath = "login" }: CustomLoginingProps) => {
 export default Registration;
 
 
+/src/components/ShareModal/ShareModal.tsx
+import { useState } from 'react';
+import '../../style/ShareModal/ShareModal.css';
+
+interface ShareModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  projectId: number;
+  projectName: string;
+  isSaved?: boolean;
+  onSave?: () => Promise<void>;
+}
+
+const ShareModal = ({ isOpen, onClose, projectId, projectName, isSaved = true, onSave }: ShareModalProps) => {
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isProjectSaved, setIsProjectSaved] = useState(isSaved);
+  const [showEmailOptions, setShowEmailOptions] = useState(false);
+
+  const shareUrl = `${window.location.origin}/view/${projectId}`;
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = shareUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } catch {
+        alert('Не удалось скопировать ссылку. Выделите её вручную и нажмите Ctrl+C');
+      }
+    }
+  };
+
+  const handleSaveAndShare = async () => {
+    if (onSave) {
+      setIsSaving(true);
+      try {
+        await onSave();
+        setIsProjectSaved(true);
+      } catch (error) {
+        alert('Ошибка при сохранении проекта. Попробуйте еще раз.');
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const detectEmailProvider = (): 'gmail' | 'mailru' | 'yandex' | null => {
+    const userEmail = localStorage.getItem('user_email');
+
+    if (userEmail) {
+      if (userEmail.includes('@gmail.com')) return 'gmail';
+      if (userEmail.includes('@mail.ru') || userEmail.includes('@bk.ru') || userEmail.includes('@list.ru')) return 'mailru';
+      if (userEmail.includes('@yandex.ru') || userEmail.includes('@ya.ru')) return 'yandex';
+    }
+
+    return null;
+  };
+
+  const getEmailUrl = (provider: string): string => {
+    const subject = encodeURIComponent(`Приглашение просмотреть проект: ${projectName}`);
+    const body = encodeURIComponent(`Здравствуйте!\n\nОтправляю Вам свой проект: ${projectName}.\n\nСсылка на проект: ${shareUrl}\n\nС уважением.`);
+
+    switch(provider) {
+      case 'gmail':
+        // Gmail использует стандартный mailto с добавлением параметров
+        // или открывает compose с заполненными полями через параметры
+        return `https://mail.google.com/mail/?view=cm&fs=1&to=&su=${subject}&body=${body}`;
+      case 'mailru':
+        return `https://e.mail.ru/compose/?subject=${subject}&body=${body}`;
+      case 'yandex':
+        return `https://mail.yandex.ru/compose?subject=${subject}&body=${body}`;
+      default:
+        return `mailto:?subject=${subject}&body=${body}`;
+    }
+  };
+
+  const handleEmailSend = async () => {
+    // Сначала копируем ссылку в буфер обмена
+    await copyToClipboard();
+
+    // Определяем провайдера
+    const provider = detectEmailProvider();
+
+    if (provider === 'gmail') {
+      // Для Gmail открываем compose окно
+      window.open(getEmailUrl('gmail'), '_blank');
+    } else if (provider === 'mailru') {
+      window.open(getEmailUrl('mailru'), '_blank');
+    } else if (provider === 'yandex') {
+      window.open(getEmailUrl('yandex'), '_blank');
+    } else {
+      // Если провайдер не определен, показываем выбор
+      setShowEmailOptions(true);
+    }
+  };
+
+  const handleManualProviderSelect = (provider: string) => {
+    window.open(getEmailUrl(provider), '_blank');
+    setShowEmailOptions(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="share-modal-overlay" onClick={onClose}>
+      <div className="share-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="share-modal-header">
+          <h3>Поделиться проектом</h3>
+          <button className="share-modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="share-modal-body">
+          {!isProjectSaved ? (
+            <>
+              <div className="share-warning">
+                <svg className="warning-icon" viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="#ff9800" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                <p>Проект ещё не сохранён в облаке. Чтобы поделиться, необходимо сначала сохранить проект.</p>
+              </div>
+              <div className="share-actions">
+                <button onClick={onClose} className="share-cancel-btn">
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSaveAndShare}
+                  className="share-save-btn"
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Сохранение...' : 'Сохранить и продолжить'}
+                </button>
+              </div>
+            </>
+          ) : showEmailOptions ? (
+            <>
+              <div className="email-provider-selection">
+                <h4>Выберите почтовый сервис</h4>
+                <div className="provider-buttons">
+                  <button onClick={() => handleManualProviderSelect('gmail')} className="provider-btn gmail">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Gmail
+                  </button>
+                  <button onClick={() => handleManualProviderSelect('mailru')} className="provider-btn mailru">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                      <path fill="#168DE2" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 13c-2.33 0-4.31-1.46-5.11-3.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5z"/>
+                    </svg>
+                    Mail.ru
+                  </button>
+                  <button onClick={() => handleManualProviderSelect('yandex')} className="provider-btn yandex">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                      <path fill="#FC3F1D" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                    </svg>
+                    Яндекс
+                  </button>
+                </div>
+                <button onClick={() => setShowEmailOptions(false)} className="back-btn">
+                  ← Назад
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="share-description">
+                Отправьте эту ссылку друзьям или коллегам. Они смогут просмотреть ваш проект, но не смогут его редактировать.
+              </p>
+
+              <div className="share-url-container">
+                <input
+                  type="text"
+                  value={shareUrl}
+                  readOnly
+                  className="share-url-input"
+                  onClick={e => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  onClick={copyToClipboard}
+                  className={`share-copy-btn ${copySuccess ? 'success' : ''}`}
+                >
+                  {copySuccess ? '✓ Скопировано!' : 'Копировать'}
+                </button>
+              </div>
+
+              <div className="share-email-section">
+                <button onClick={handleEmailSend} className="share-email-btn">
+                  <svg viewBox="0 0 24 24" width="20" height="20">
+                    <path fill="currentColor" d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                  </svg>
+                  Отправить по email
+                </button>
+              </div>
+
+              <div className="share-actions">
+                <button onClick={onClose} className="share-close-btn">
+                  Закрыть
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ShareModal;
+
+
 /src/components/userProgects/UserProgects.tsx
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -1827,6 +2051,7 @@ import Main from './panel/Main';
 import DevArea from './panel/DevArea';
 import EditProgect from './panel/EditProgect';
 import AuthCallback from './panel/AuthCallback';
+import ViewProject from './panel/ViewProject';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -1841,6 +2066,7 @@ root.render(
         <Route path='/main' element={<Main />} />
         <Route path='/dev' element={<DevArea />} />
         <Route path='/edit/:id' element={<EditProgect />} />
+        <Route path='/view/:id' element={<ViewProject />} />
         <Route path='/auth/callback' element={<AuthCallback />} />
       </Routes>
     </Router>
@@ -1923,6 +2149,7 @@ import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
 import { api } from '../services/api';
+import ShareModal from '../components/ShareModal/ShareModal';
 
 const DEFAULT_TEMPLATE = {
   html: '<!DOCTYPE html><html><head><title>New Project</title></head><body><h1>New Project</h1></body></html>',
@@ -1960,7 +2187,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         display: none;
       }
 
-      /* Базовые стили для iframe */
       iframe {
         border: none;
       }
@@ -2138,17 +2364,20 @@ const DevArea = () => {
   const [templateName, setTemplateName] = useState<string>('Новый проект');
   const [iframeKey, setIframeKey] = useState(Date.now());
   const [showGithubModal, setShowGithubModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [githubStatus, setGithubStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [githubError, setGithubError] = useState('');
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [isProjectSaved, setIsProjectSaved] = useState(false);
+
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollPositionRef = useRef<number>(0);
 
-  // Функция для получения правильного языка для Monaco
   const getMonacoLanguage = (tab: string): string => {
     switch(tab) {
       case 'html': return 'html';
@@ -2166,7 +2395,6 @@ const DevArea = () => {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
 
-    // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
@@ -2181,7 +2409,6 @@ const DevArea = () => {
       });
     }
 
-    // Определяем тему
     monaco.editor.defineTheme('customLight', {
       base: 'vs',
       inherit: true,
@@ -2223,7 +2450,6 @@ const DevArea = () => {
     monaco.editor.setTheme('customLight');
   };
 
-  // Обновляем язык при смене вкладки (БЕЗ прокрутки)
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -2236,6 +2462,29 @@ const DevArea = () => {
     }
   }, [activeTab]);
 
+  const saveScrollPosition = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        const scrollY = iframeRef.current.contentWindow.scrollY;
+        if (typeof scrollY === 'number' && !isNaN(scrollY)) {
+          scrollPositionRef.current = scrollY;
+        }
+      } catch (e) {}
+    }
+  };
+
+  const restoreScrollPosition = useCallback(() => {
+    if (iframeRef.current && iframeRef.current.contentWindow && scrollPositionRef.current > 0) {
+      try {
+        iframeRef.current.contentWindow.scrollTo(0, scrollPositionRef.current);
+      } catch (e) {}
+    }
+  }, []);
+
+  const handleIframeLoad = useCallback(() => {
+    restoreScrollPosition();
+  }, [restoreScrollPosition]);
+
   useEffect(() => {
     const handleIframeMessages = (event: MessageEvent) => {
       if (event.data?.type === 'console') {
@@ -2244,13 +2493,9 @@ const DevArea = () => {
     };
 
     window.addEventListener('message', handleIframeMessages);
-
-    return () => {
-      window.removeEventListener('message', handleIframeMessages);
-    };
+    return () => window.removeEventListener('message', handleIframeMessages);
   }, []);
 
-  // Добавляем глобальные стили для подсказок
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -2274,15 +2519,15 @@ const DevArea = () => {
       .monaco-editor .token.function { color: #795E26 !important; }
     `;
     document.head.appendChild(style);
-
     return () => {
-      document.head.removeChild(style);
+      if (style && style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
     };
   }, []);
 
   const insertTextAtCursor = (text: string) => {
     if (!editorRef.current) return;
-
     const selection = editorRef.current.getSelection();
     const range = {
       startLineNumber: selection.startLineNumber,
@@ -2290,7 +2535,6 @@ const DevArea = () => {
       endLineNumber: selection.endLineNumber,
       endColumn: selection.endColumn
     };
-
     editorRef.current.executeEdits('insert-image', [{
       range,
       text: text,
@@ -2309,27 +2553,23 @@ const DevArea = () => {
     }
   };
 
-  // Функция обновления iframe с debounce
   const updateIframeContent = useCallback(() => {
-    // Очищаем предыдущий таймер
     if (updateTimerRef.current) {
       clearTimeout(updateTimerRef.current);
     }
 
-    // Устанавливаем новый таймер
+    saveScrollPosition();
+
     updateTimerRef.current = setTimeout(() => {
       const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
       setSrcDoc(isolatedHtml);
-      setIframeKey(Date.now());
+      setIframeKey(prev => prev + 1);
       updateTimerRef.current = null;
-    }, 500); // Задержка 500ms
+    }, 500);
   }, [code]);
 
-  // Запускаем debounced обновление при изменении кода
   useEffect(() => {
     updateIframeContent();
-
-    // Очищаем таймер при размонтировании
     return () => {
       if (updateTimerRef.current) {
         clearTimeout(updateTimerRef.current);
@@ -2399,6 +2639,7 @@ const DevArea = () => {
 
       setProjectId(data.project.id);
       setSaveStatus('saved');
+      setIsProjectSaved(true);
       setTimeout(() => navigate(`/edit/${data.project.id}`), 1000);
     } catch (error) {
       console.error('Save error:', error);
@@ -2471,6 +2712,16 @@ const DevArea = () => {
         <h2 className="project-title">{templateName}</h2>
         <div className="header-actions">
           <button
+            className="share-btn"
+            onClick={() => setShowShareModal(true)}
+            title="Поделиться проектом"
+          >
+            <svg className="share-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+            Поделиться
+          </button>
+          <button
             className={`github-btn ${githubStatus}`}
             onClick={() => setShowGithubModal(true)}
             disabled={githubStatus === 'saving'}
@@ -2481,7 +2732,7 @@ const DevArea = () => {
             ) : githubStatus === 'success' ? (
               '✓ Сохранено'
             ) : githubStatus === 'error' ? (
-              '❌ Ошибка'
+              'Ошибка'
             ) : (
               <>
                 <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20">
@@ -2508,21 +2759,21 @@ const DevArea = () => {
             onClick={() => setViewportSize('desktop')}
             title="Десктоп"
           >
-            💻 Десктоп
+            Десктоп
           </button>
           <button
             className={`viewport-btn tablet ${viewportSize === 'tablet' ? 'active' : ''}`}
             onClick={() => setViewportSize('tablet')}
             title="Планшет"
           >
-            📱 Планшет
+            Планшет
           </button>
           <button
             className={`viewport-btn mobile ${viewportSize === 'mobile' ? 'active' : ''}`}
             onClick={() => setViewportSize('mobile')}
             title="Мобильный"
           >
-            📱 Мобильный
+            Мобильный
           </button>
         </div>
       </div>
@@ -2557,6 +2808,7 @@ const DevArea = () => {
                 sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
+                onLoad={handleIframeLoad}
                 style={{
                   border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
@@ -2680,6 +2932,17 @@ const DevArea = () => {
         </div>
       </div>
 
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        projectId={projectId || 0}
+        projectName={templateName}
+        isSaved={isProjectSaved}
+        onSave={async () => {
+          await handleSaveToCloud();
+        }}
+      />
+
       {showGithubModal && (
         <GithubSetup
           onSave={handleGithubSave}
@@ -2708,6 +2971,7 @@ import ImageUploader from '../components/ImageUploader/ImageUploader';
 import GithubSetup from '../components/GithubSetup/GithubSetup';
 import GitHubClient from '../utils/github';
 import { api } from '../services/api';
+import ShareModal from '../components/ShareModal/ShareModal';
 
 interface TemplateFiles {
   html: string;
@@ -2748,18 +3012,15 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         display: none;
       }
 
-      /* Базовые стили для iframe */
       iframe {
         border: none;
       }
     </style>
   `;
 
-  // Улучшенный скрипт для полной изоляции ссылок и предотвращения навигации
   const anchorHandler = `
     <script>
       (function() {
-        // Функция для прокрутки к элементу по якорю
         function scrollToAnchor(hash) {
           if (!hash || hash === '#') return;
           const targetId = hash.substring(1);
@@ -2772,34 +3033,29 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           }
         }
 
-        // Полная изоляция всех ссылок
         function handleLinkClick(e) {
           const link = e.target.closest('a');
           if (!link) return;
 
           const href = link.getAttribute('href');
 
-          // Если ссылка пустая или просто '#'
           if (!href || href === '#') {
             e.preventDefault();
             e.stopPropagation();
             return false;
           }
 
-          // Если ссылка - якорь (начинается с #)
           if (href.startsWith('#')) {
             e.preventDefault();
             e.stopPropagation();
             const hash = href;
             scrollToAnchor(hash);
-            // Обновляем хеш в URL iframe без перезагрузки
             if (window.location.hash !== hash) {
               history.replaceState(null, '', hash);
             }
             return false;
           }
 
-          // Если ссылка ведет на другой сайт - открываем в новой вкладке
           if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
             e.preventDefault();
             e.stopPropagation();
@@ -2807,60 +3063,48 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             return false;
           }
 
-          // Для всех остальных ссылок (относительные пути) - блокируем навигацию
           e.preventDefault();
           e.stopPropagation();
           console.log('Navigation blocked in preview mode:', href);
           return false;
         }
 
-        // Перехватываем все клики на ссылки
         document.addEventListener('click', handleLinkClick, true);
 
-        // Обрабатываем начальный хеш при загрузке
         if (window.location.hash) {
           setTimeout(() => {
             scrollToAnchor(window.location.hash);
           }, 100);
         }
 
-        // Перехватываем изменения хеша
         window.addEventListener('hashchange', function(e) {
           e.preventDefault();
           scrollToAnchor(window.location.hash);
         });
 
-        // Блокируем все попытки навигации через history API
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
 
         history.pushState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (pushState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
         history.replaceState = function(state, title, url) {
-          // Разрешаем только изменение хеша
           if (typeof url === 'string' && url.startsWith('#')) {
             scrollToAnchor(url);
             originalReplaceState.call(this, state, title, url);
             return;
           }
-
-          // Блокируем любую другую навигацию
           console.log('Navigation blocked (replaceState):', url);
           originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
         };
 
-        // Блокируем переходы по ссылкам через атрибуты target
         const originalOpen = window.open;
         window.open = function(url, name, features) {
           if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
@@ -2870,7 +3114,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
           return null;
         };
 
-        // Блокируем переходы через location
         const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
         Object.defineProperty(window.location, 'href', {
           set: function(value) {
@@ -2884,8 +3127,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
             return originalLocationHref?.get.call(window.location) || '';
           }
         });
-
-        console.log('Anchor links isolation enabled for preview iframe');
       })();
     </script>
   `;
@@ -2899,7 +3140,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
     <base target="_self">
     ${hideScrollbarStyles}
     <style>
-      /* Базовые стили для предпросмотра */
       * {
         box-sizing: border-box;
         max-width: 100%;
@@ -2908,8 +3148,6 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
         max-width: 100%;
         height: auto;
       }
-
-      /* Стили пользователя */
       ${css}
     </style>
     ${anchorHandler}
@@ -2917,14 +3155,12 @@ const createIsolatedHTML = (html: string, css: string, js: string) => {
   <body>
     ${html}
     <script>
-      // Пользовательский JavaScript
       try {
         ${js}
       } catch (error) {
         console.error('Error in user script:', error);
       }
 
-      // Дополнительный код для совместимости
       (function() {
         const originalOnHashChange = window.onhashchange;
         window.onhashchange = function(e) {
@@ -2951,18 +3187,19 @@ const EditProject = () => {
   const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
   const [iframeKey, setIframeKey] = useState(Date.now());
   const [showGithubModal, setShowGithubModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [githubStatus, setGithubStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [githubError, setGithubError] = useState('');
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [editorKey, setEditorKey] = useState(Date.now());
 
   const editorRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollPositionRef = useRef<number>(0);
   let saveTimer: NodeJS.Timeout;
 
-  // Функция для получения правильного языка для Monaco
   const getMonacoLanguage = (tab: string): string => {
     switch(tab) {
       case 'html': return 'html';
@@ -2975,13 +3212,11 @@ const EditProject = () => {
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
 
-    // Принудительно устанавливаем язык
     const model = editor.getModel();
     if (model) {
       monaco.editor.setModelLanguage(model, getMonacoLanguage(activeTab));
     }
 
-    // Настройка подсветки JavaScript
     if (monaco.languages?.typescript?.javascriptDefaults) {
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
@@ -2990,14 +3225,12 @@ const EditProject = () => {
         checkJs: false
       });
 
-      // Включаем подсказки для JavaScript
       monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: false,
         noSyntaxValidation: false
       });
     }
 
-    // Явно определяем тему с правильными цветами для подсказок
     monaco.editor.defineTheme('customLight', {
       base: 'vs',
       inherit: true,
@@ -3036,31 +3269,9 @@ const EditProject = () => {
       }
     });
 
-    // Применяем тему
     monaco.editor.setTheme('customLight');
-
-    // Принудительно обновляем подсказки
-    setTimeout(() => {
-      editor.trigger('', 'editor.action.triggerSuggest', {});
-    }, 500);
   };
 
-  useEffect(() => {
-  const handleIframeMessages = (event: MessageEvent) => {
-    // Получаем сообщения из iframe
-    if (event.data?.type === 'console') {
-      console.log(`[Iframe] ${event.data.level}:`, event.data.args);
-    }
-  };
-
-  window.addEventListener('message', handleIframeMessages);
-
-  return () => {
-    window.removeEventListener('message', handleIframeMessages);
-  };
-}, []);
-
-  // Обновляем язык при смене вкладки
   useEffect(() => {
     if (editorRef.current) {
       const monaco = (window as any).monaco;
@@ -3073,7 +3284,6 @@ const EditProject = () => {
     }
   }, [activeTab]);
 
-  // Добавляем глобальные стили для подсказок
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -3097,17 +3307,70 @@ const EditProject = () => {
       .monaco-editor .token.function { color: #795E26 !important; }
     `;
     document.head.appendChild(style);
-
     return () => {
-      document.head.removeChild(style);
+      if (style && style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
     };
   }, []);
 
+  const saveScrollPosition = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        const scrollY = iframeRef.current.contentWindow.scrollY;
+        if (typeof scrollY === 'number' && !isNaN(scrollY)) {
+          scrollPositionRef.current = scrollY;
+        }
+      } catch (e) {}
+    }
+  };
+
+  const restoreScrollPosition = useCallback(() => {
+    if (iframeRef.current && iframeRef.current.contentWindow && scrollPositionRef.current > 0) {
+      try {
+        iframeRef.current.contentWindow.scrollTo(0, scrollPositionRef.current);
+      } catch (e) {}
+    }
+  }, []);
+
+  const handleIframeLoad = useCallback(() => {
+    restoreScrollPosition();
+  }, [restoreScrollPosition]);
+
+  useEffect(() => {
+    const handleIframeMessages = (event: MessageEvent) => {
+      if (event.data?.type === 'console') {
+        console.log(`[Iframe] ${event.data.level}:`, event.data.args);
+      }
+    };
+
+    window.addEventListener('message', handleIframeMessages);
+    return () => window.removeEventListener('message', handleIframeMessages);
+  }, []);
+
   const updateIframeContent = useCallback(() => {
-    const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
-    setSrcDoc(isolatedHtml);
-    setIframeKey(Date.now());
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+    }
+
+    saveScrollPosition();
+
+    updateTimerRef.current = setTimeout(() => {
+      const isolatedHtml = createIsolatedHTML(code.html, code.css, code.js);
+      setSrcDoc(isolatedHtml);
+      setIframeKey(prev => prev + 1);
+      updateTimerRef.current = null;
+    }, 500);
   }, [code]);
+
+  useEffect(() => {
+    updateIframeContent();
+    return () => {
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+      }
+    };
+  }, [code, updateIframeContent]);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -3187,14 +3450,6 @@ const EditProject = () => {
       saveTimer = setTimeout(() => saveProject(newCode), SAVE_DEBOUNCE_DELAY);
     }
   };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      updateIframeContent();
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [code, updateIframeContent]);
 
   const handleSaveToZip = () => {
     const zip = new JSZip();
@@ -3299,6 +3554,16 @@ const EditProject = () => {
         <h2 className="project-title">Редактирование: {projectName}</h2>
         <div className="header-actions">
           <button
+            className="share-btn"
+            onClick={() => setShowShareModal(true)}
+            title="Поделиться проектом"
+          >
+            <svg className="share-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+            Поделиться
+          </button>
+          <button
             className={`github-btn ${githubStatus}`}
             onClick={() => setShowGithubModal(true)}
             disabled={githubStatus === 'saving'}
@@ -3309,7 +3574,7 @@ const EditProject = () => {
             ) : githubStatus === 'success' ? (
               '✓ Сохранено'
             ) : githubStatus === 'error' ? (
-              '❌ Ошибка'
+              'Ошибка'
             ) : (
               <>
                 <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20">
@@ -3331,7 +3596,7 @@ const EditProject = () => {
 
       {githubRepo && (
         <div className="github-info-banner">
-          <span>📦 Репозиторий: {githubRepo}</span>
+          <span>Репозиторий: {githubRepo}</span>
           <a
             href={`https://github.com/${githubRepo}`}
             target="_blank"
@@ -3350,21 +3615,21 @@ const EditProject = () => {
             onClick={() => setViewportSize('desktop')}
             title="Десктоп"
           >
-            💻 Десктоп
+            Десктоп
           </button>
           <button
             className={`viewport-btn tablet ${viewportSize === 'tablet' ? 'active' : ''}`}
             onClick={() => setViewportSize('tablet')}
             title="Планшет"
           >
-            📱 Планшет
+            Планшет
           </button>
           <button
             className={`viewport-btn mobile ${viewportSize === 'mobile' ? 'active' : ''}`}
             onClick={() => setViewportSize('mobile')}
             title="Мобильный"
           >
-            📱 Мобильный
+            Мобильный
           </button>
         </div>
       </div>
@@ -3396,9 +3661,10 @@ const EditProject = () => {
                 ref={iframeRef}
                 srcDoc={srcDoc}
                 title="preview"
-                sandbox="llow-same-origin allow-scripts allow-forms allow-modals allow-popups"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups"
                 width="100%"
                 height="100%"
+                onLoad={handleIframeLoad}
                 style={{
                   border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
                   borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
@@ -3456,7 +3722,6 @@ const EditProject = () => {
 
           <div className="editor-content">
             <Editor
-              key={editorKey}
               height="100%"
               width="100%"
               language={getMonacoLanguage(activeTab)}
@@ -3508,12 +3773,29 @@ const EditProject = () => {
                 suggestSelection: 'first',
                 acceptSuggestionOnEnter: 'on',
                 tabCompletion: 'on',
-                snippetSuggestions: 'top'
+                snippetSuggestions: 'top',
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'visible',
+                  verticalScrollbarSize: 12,
+                  horizontalScrollbarSize: 12,
+                },
+                scrollBeyondLastColumn: 0,
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
               }}
             />
           </div>
         </div>
       </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        projectId={parseInt(id!)}
+        projectName={projectName}
+      />
 
       {showGithubModal && (
         <GithubSetup
@@ -3771,6 +4053,501 @@ function RegistrationSystem() {
 }
 
 export default RegistrationSystem;
+
+
+/src/panel/ViewProject.tsx
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import Logo from '../components/logo/Logo';
+import Editor from '@monaco-editor/react';
+import '../style/DevArea/DevArea.css';
+
+interface ProjectData {
+  id: number;
+  name: string;
+  html: string;
+  css: string;
+  js: string;
+  ownerType: string;
+  ownerId: number;
+  created_at: string;
+  updated_at: string;
+}
+
+type ViewportSize = 'desktop' | 'tablet' | 'mobile';
+type CodeTab = 'html' | 'css' | 'js';
+
+const VIEWPORT_SIZES = {
+  desktop: { width: '100%', height: '100%', label: 'Десктоп' },
+  tablet: { width: '768px', height: '1024px', label: 'Планшет' },
+  mobile: { width: '375px', height: '667px', label: 'Мобильный' }
+};
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const createIsolatedHTML = (html: string, css: string, js: string) => {
+  const hideScrollbarStyles = `
+    <style>
+      html {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      html::-webkit-scrollbar {
+        display: none;
+      }
+      body {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+  `;
+
+  const anchorHandler = `
+    <script>
+      (function() {
+        function scrollToAnchor(hash) {
+          if (!hash || hash === '#') return;
+          const targetId = hash.substring(1);
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        }
+
+        function handleLinkClick(e) {
+          const link = e.target.closest('a');
+          if (!link) return;
+
+          const href = link.getAttribute('href');
+
+          if (!href || href === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+
+          if (href.startsWith('#')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const hash = href;
+            scrollToAnchor(hash);
+            if (window.location.hash !== hash) {
+              history.replaceState(null, '', hash);
+            }
+            return false;
+          }
+
+          if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(href, '_blank');
+            return false;
+          }
+
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Navigation blocked in preview mode:', href);
+          return false;
+        }
+
+        document.addEventListener('click', handleLinkClick, true);
+
+        if (window.location.hash) {
+          setTimeout(() => {
+            scrollToAnchor(window.location.hash);
+          }, 100);
+        }
+
+        window.addEventListener('hashchange', function(e) {
+          e.preventDefault();
+          scrollToAnchor(window.location.hash);
+        });
+
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function(state, title, url) {
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        history.replaceState = function(state, title, url) {
+          if (typeof url === 'string' && url.startsWith('#')) {
+            scrollToAnchor(url);
+            originalReplaceState.call(this, state, title, url);
+            return;
+          }
+          originalReplaceState.call(this, state, title, window.location.pathname + window.location.search + (window.location.hash || ''));
+        };
+
+        const originalOpen = window.open;
+        window.open = function(url, name, features) {
+          if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            return originalOpen.call(window, url, '_blank', features);
+          }
+          console.log('Window.open blocked:', url);
+          return null;
+        };
+
+        const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
+        Object.defineProperty(window.location, 'href', {
+          set: function(value) {
+            if (value && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('//'))) {
+              console.log('Location.href redirect blocked:', value);
+              return;
+            }
+            console.log('Location.href blocked:', value);
+          },
+          get: function() {
+            return originalLocationHref?.get.call(window.location) || '';
+          }
+        });
+      })();
+    </script>
+  `;
+
+  return `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base target="_self">
+    ${hideScrollbarStyles}
+    <style>
+      * {
+        box-sizing: border-box;
+        max-width: 100%;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+      }
+      ${css}
+    </style>
+    ${anchorHandler}
+  </head>
+  <body>
+    ${html}
+    <script>
+      try {
+        ${js}
+      } catch (error) {
+        console.error('Error in user script:', error);
+      }
+    </script>
+  </body>
+</html>
+  `;
+};
+
+const ViewProject = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [srcDoc, setSrcDoc] = useState('');
+  const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
+  const [showCode, setShowCode] = useState(false);
+  const [activeTab, setActiveTab] = useState<CodeTab>('html');
+
+  const getMonacoLanguage = (tab: string): string => {
+    switch(tab) {
+      case 'html': return 'html';
+      case 'css': return 'css';
+      case 'js': return 'javascript';
+      default: return 'plaintext';
+    }
+  };
+
+  const getViewportStyle = (): React.CSSProperties => {
+    const size = VIEWPORT_SIZES[viewportSize];
+    return {
+      maxWidth: size.width,
+      width: viewportSize === 'desktop' ? '100%' : size.width,
+      height: viewportSize === 'desktop' ? '100%' : size.height,
+      margin: '0 auto',
+      transition: 'all 0.3s ease',
+      overflow: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none'
+    };
+  };
+
+  useEffect(() => {
+    const loadProject = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`${API_URL}/api/projects/public/${id}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load project');
+        }
+
+        if (!data.project) {
+          throw new Error('Project not found');
+        }
+
+        const projectData: ProjectData = {
+          id: data.project.id,
+          name: data.project.name,
+          html: data.project.html || '',
+          css: data.project.css || '',
+          js: data.project.js || '',
+          ownerType: data.project.owner_type,
+          ownerId: data.project.owner_id,
+          created_at: data.project.created_at,
+          updated_at: data.project.updated_at
+        };
+
+        setProject(projectData);
+
+        const isolatedHtml = createIsolatedHTML(
+          projectData.html,
+          projectData.css,
+          projectData.js
+        );
+        setSrcDoc(isolatedHtml);
+      } catch (err) {
+        console.error('Error loading project:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load project');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadProject();
+    }
+  }, [id]);
+
+  // Добавляем глобальные стили для скрытия полос прокрутки
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      div[style*="overflow: auto"]::-webkit-scrollbar {
+        display: none;
+      }
+      div[style*="overflow: auto"] {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .view-only-editor {
+        opacity: 0.9;
+      }
+      .view-only-editor .monaco-editor .scroll-decoration {
+        box-shadow: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="dev-area">
+        <header className='headerPanelDev'>
+          <Logo createSitePath=''/>
+          <h2 className="project-title">Загрузка проекта...</h2>
+        </header>
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>Загрузка проекта...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !project) {
+    return (
+      <div className="dev-area">
+        <header className='headerPanelDev'>
+          <Logo createSitePath=''/>
+          <h2 className="project-title">Ошибка</h2>
+        </header>
+        <div className="error-container" style={{ textAlign: 'center', padding: '50px' }}>
+          <p style={{ color: '#e74c3c', fontSize: '18px' }}>{error || 'Проект не найден'}</p>
+          <button
+            onClick={() => navigate('/')}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              background: '#b9ff66',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            На главную
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dev-area">
+      <header className='headerPanelDev'>
+        <Logo createSitePath=''/>
+        <h2 className="project-title">Просмотр: {project.name}</h2>
+        <div className="header-actions">
+          <button
+            onClick={() => setShowCode(!showCode)}
+            className={`code-toggle-btn ${showCode ? 'active' : ''}`}
+            title={showCode ? 'Скрыть код' : 'Показать код'}
+          >
+            {showCode ? 'Скрыть код' : 'Показать код'}
+          </button>
+          <div className="view-only-badge">
+            Режим просмотра
+          </div>
+          <button
+            onClick={() => navigate('/')}
+            className="home-btn"
+          >
+            На главную
+          </button>
+        </div>
+      </header>
+
+      <div className="viewport-controls">
+        <div className="viewport-selector">
+          <button
+            className={`viewport-btn desktop ${viewportSize === 'desktop' ? 'active' : ''}`}
+            onClick={() => setViewportSize('desktop')}
+            title="Десктоп"
+          >
+            Десктоп
+          </button>
+          <button
+            className={`viewport-btn tablet ${viewportSize === 'tablet' ? 'active' : ''}`}
+            onClick={() => setViewportSize('tablet')}
+            title="Планшет"
+          >
+            Планшет
+          </button>
+          <button
+            className={`viewport-btn mobile ${viewportSize === 'mobile' ? 'active' : ''}`}
+            onClick={() => setViewportSize('mobile')}
+            title="Мобильный"
+          >
+            Мобильный
+          </button>
+        </div>
+      </div>
+
+      <div className="main-content" style={{ height: showCode ? 'calc(100vh - 135px)' : 'calc(100vh - 95px)' }}>
+        <div className="preview-section" style={{ width: showCode ? '60%' : '100%', transition: 'width 0.3s ease' }}>
+          <div className="preview-container" style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            backgroundColor: '#f0f0f0',
+            height: '100%',
+            padding: '20px',
+            overflow: 'hidden'
+          }}>
+            <div style={getViewportStyle()}>
+              <iframe
+                srcDoc={srcDoc}
+                title="preview"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups"
+                width="100%"
+                height="100%"
+                style={{
+                  border: viewportSize === 'desktop' ? 'none' : '2px solid #ddd',
+                  borderRadius: viewportSize === 'mobile' ? '30px' : viewportSize === 'tablet' ? '20px' : '0',
+                  boxShadow: viewportSize !== 'desktop' ? '0 10px 25px rgba(0,0,0,0.1)' : 'none',
+                  backgroundColor: 'white',
+                  overflow: 'hidden'
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {showCode && (
+          <div className="editor-section view-only-editor">
+            <div className="editor-header">
+              <div className="editor-tabs">
+                <button
+                  className={`tab-btn ${activeTab === 'html' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('html')}
+                >
+                  HTML
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'css' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('css')}
+                >
+                  CSS
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'js' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('js')}
+                >
+                  JS
+                </button>
+              </div>
+              <div className="readonly-badge">
+                Только просмотр
+              </div>
+            </div>
+
+            <div className="editor-content">
+              <Editor
+                height="100%"
+                width="100%"
+                language={getMonacoLanguage(activeTab)}
+                value={activeTab === 'html' ? project.html : activeTab === 'css' ? project.css : project.js}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  folding: true,
+                  renderWhitespace: 'selection',
+                  scrollbar: {
+                    vertical: 'visible',
+                    horizontal: 'visible',
+                    verticalScrollbarSize: 10,
+                    horizontalScrollbarSize: 10,
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ViewProject;
 
 
 /src/picture/examplesWebsite/example.png
@@ -4441,7 +5218,7 @@ class ApiService {
 
     const url = `${API_URL}${endpoint}`;
 
-    console.log('🔍 API Request:', {
+    console.log('API Request:', {
       url,
       method: options.method || 'GET',
       hasToken: !!this.token,
@@ -4469,14 +5246,14 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('❌ API Error:', data);
+        console.error('API Error:', data);
         return { error: data.error || 'Request failed' };
       }
 
-      console.log('✅ API Success:', data);
+      console.log('API Success:', data);
       return { data };
     } catch (error) {
-      console.error('❌ Network Error:', error);
+      console.error('Network Error:', error);
       return { error: error instanceof Error ? error.message : 'Network error' };
     }
   }
@@ -4625,6 +5402,10 @@ class ApiService {
     return this.request<{ message: string }>(`/api/templates/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  async getPublicProject(id: string): Promise<ApiResponse<{ project: Project }>> {
+    return this.request<{ project: Project }>(`/api/projects/public/${id}`);
   }
 }
 
@@ -5075,6 +5856,146 @@ import '@testing-library/jest-dom';
   padding: 10px 20px;
   text-align: center;
   font-size: 14px;
+}
+
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.share-btn:hover {
+  background-color: #1976D2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.share-icon {
+  margin-right: 4px;
+}
+
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.share-btn:hover {
+  background-color: #1976D2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.share-icon {
+  margin-right: 4px;
+}
+
+.view-only-badge {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #f0f0f0;
+  border-radius: 20px;
+  font-size: 14px;
+  color: #666;
+  margin-right: 15px;
+}
+
+.home-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-left: 10px;
+}
+
+.home-btn:hover {
+  background-color: #5a6268;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+.code-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #b9ff66;
+;
+  color: black;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-right: 10px;
+}
+
+.code-toggle-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
+}
+
+.code-toggle-btn.active {
+  background-color: #b9ff66;
+}
+
+.readonly-badge {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background-color: #f0f0f0;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #666;
+}
+
+.view-only-editor {
+  border-left: 1px solid #e0e0e0;
+}
+
+.view-only-editor .editor-header {
+  background-color: #fafafa;
+}
+
+.view-only-editor .monaco-editor .cursor {
+  display: none !important;
+}
+
+.view-only-editor .monaco-editor .selected-text {
+  background-color: rgba(185, 255, 102, 0.3) !important;
+}
+
+.view-only-editor .monaco-editor .view-line {
+  user-select: text;
+  cursor: text;
 }
 
 /* Адаптивность */
@@ -6804,6 +7725,346 @@ import '@testing-library/jest-dom';
 .blockLabel {
   font-size: 22px;
 }
+
+
+/src/style/ShareModal/ShareModal.css
+.share-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.share-modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease;
+}
+
+.share-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.share-modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.share-modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.share-modal-close:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.share-modal-body {
+  padding: 24px;
+}
+
+.share-description {
+  margin: 0 0 20px 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.share-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background-color: #fff3e0;
+  border: 1px solid #ffe0b2;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.warning-icon {
+  flex-shrink: 0;
+}
+
+.share-warning p {
+  margin: 0;
+  color: #e65100;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.share-url-container {
+  display: flex;
+  margin-bottom: 20px;
+}
+
+.share-url-input {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px 0 0 8px;
+  font-size: 14px;
+  font-family: monospace;
+  background: #f8f9fa;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.share-url-input:focus {
+  border-color: #b9ff66;
+  background: white;
+}
+
+.share-copy-btn {
+  padding: 12px 24px;
+  background-color: #b9ff66;
+  color: #333;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.share-copy-btn:hover {
+  background-color: #a0e64d;
+}
+
+.share-copy-btn.success {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.share-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.share-close-btn {
+  padding: 10px 20px;
+  background-color: transparent;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.share-close-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.share-cancel-btn {
+  padding: 10px 20px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.share-cancel-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.share-save-btn {
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.share-save-btn:hover:not(:disabled) {
+  background-color: #45a049;
+  transform: translateY(-1px);
+}
+
+.share-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Добавьте в конец файла */
+
+.share-email-section {
+  margin: 20px 0;
+}
+
+.share-email-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.share-email-btn:hover {
+  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.email-provider-selection {
+  text-align: center;
+}
+
+.email-provider-selection h4 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.provider-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.provider-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.provider-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.provider-btn.gmail:hover {
+  border-color: #4285F4;
+  background-color: rgba(66, 133, 244, 0.05);
+}
+
+.provider-btn.mailru:hover {
+  border-color: #168DE2;
+  background-color: rgba(22, 141, 226, 0.05);
+}
+
+.provider-btn.yandex:hover {
+  border-color: #FC3F1D;
+  background-color: rgba(252, 63, 29, 0.05);
+}
+
+.back-btn {
+  padding: 10px 20px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background-color: #e0e0e0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .share-modal-body {
+    padding: 20px;
+  }
+
+  .share-url-container {
+    flex-direction: column;
+  }
+
+  .share-url-input {
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+
+  .share-copy-btn {
+    border-radius: 8px;
+    width: 100%;
+  }
+
+  .share-actions {
+    flex-direction: column;
+  }
+
+  .share-cancel-btn,
+  .share-save-btn,
+  .share-close-btn {
+    width: 100%;
+  }
+}
+
 
 
 /src/style/UserProgects/UserProjects.css

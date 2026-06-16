@@ -15,7 +15,7 @@ interface LocationState {
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
+const Logining = ({ createPath = "/registration" }: CustomLoginingProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState(location.state?.email || '');
@@ -94,7 +94,7 @@ const Logining = ({ createPath = "registration" }: CustomLoginingProps) => {
           </button>
           <a
             type="button"
-            onClick={() => handleNavigate(navigate, createPath)}
+            onClick={() => handleNavigate(navigate, "/registration")}
             className='link'
           >
             Еще не зарегистрирован
